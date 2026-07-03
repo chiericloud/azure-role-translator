@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Azure ロール翻訳ツール | Azure Role Translator</title>
+  <meta name="description" content="Azure の組み込みロール（RBAC）名と説明を日本語に翻訳・検索できる無料ツール。Owner、Contributor、Reader などのロールを日本語で素早く調べられます。" />
+  <meta property="og:title" content="Azure ロール翻訳ツール | Azure Role Translator" />
+  <meta property="og:description" content="Azure の組み込みロール（RBAC）名と説明を日本語に翻訳・検索できる無料ツール。" />
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="ja_JP" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Zen+Kaku+Gothic+New:wght@300;400;500;700;900&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --ink: #15171c; --muted: #51555f; --faint: #888c97;
+      --blue: #0078d4; --slate: #5b7290;
+      --glass: rgba(255,255,255,.55); --glass-strong: rgba(255,255,255,.8); --glass-border: rgba(255,255,255,.6);
+      --shadow: 0 10px 36px -14px rgba(15,30,60,.28);
+      --r: 18px;
+    }
+    body {
+      font-family:'Inter','Meiryo UI',Meiryo,'Zen Kaku Gothic New','Noto Sans JP',sans-serif;
+      font-weight:400; color:var(--ink); min-height:100vh; -webkit-font-smoothing:antialiased;
+      background:
+        radial-gradient(at 12% 8%, rgba(0,120,212,.34), transparent 55%),
+        radial-gradient(at 88% 6%, rgba(91,114,144,.26), transparent 50%),
+        radial-gradient(at 50% 105%, rgba(0,150,180,.2), transparent 55%),
+        linear-gradient(160deg,#eef2f9,#e6ebf4);
+      background-attachment:fixed;
+    }
+
+    /* ── header ── */
+    header {
+      background:rgba(13,22,40,.5); backdrop-filter:blur(22px) saturate(180%); -webkit-backdrop-filter:blur(22px) saturate(180%);
+      border-bottom:1px solid rgba(255,255,255,.14);
+      color:#fff; padding:52px 24px 36px; text-align:center;
+    }
+    .logo { display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:14px; }
+    .logo svg { width:32px; height:32px; filter:drop-shadow(0 2px 8px rgba(0,0,0,.25)); }
+    h1 { font-size:clamp(1.3rem,3.4vw,1.9rem); font-weight:600; letter-spacing:.2px; }
+    header p { font-size:.83rem; color:rgba(255,255,255,.6); margin-top:10px; font-weight:300; letter-spacing:.2px; }
+    .stats { display:flex; justify-content:center; align-items:center; gap:0; margin-top:28px; flex-wrap:wrap; }
+    .stats > div { padding:0 28px; position:relative; }
+    .stats > div + div::before { content:''; position:absolute; left:0; top:4px; bottom:4px; width:1px; background:rgba(255,255,255,.18); }
+    .stat-n { font-size:1.35rem; font-weight:600; letter-spacing:.2px; background:linear-gradient(135deg,#fff,#bcd9ff); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    .stat-l { font-size:.64rem; color:rgba(255,255,255,.5); margin-top:3px; text-transform:uppercase; letter-spacing:1px; font-weight:400; }
+
+    /* ── docs panel ── */
+    .docs-panel { max-width:1100px; margin:-24px auto 0; padding:0 20px; position:relative; z-index:1; }
+    .docs-card {
+      background:var(--glass); backdrop-filter:blur(18px) saturate(180%); -webkit-backdrop-filter:blur(18px) saturate(180%);
+      border:1px solid var(--glass-border); border-radius:var(--r);
+      padding:20px 24px; box-shadow:var(--shadow);
+    }
+    .docs-card-header { display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none; }
+    .docs-card-header svg { color:var(--blue); flex-shrink:0; }
+    .docs-card-title { font-weight:600; font-size:.86rem; color:var(--ink); letter-spacing:.1px; }
+    .docs-card-subtitle { font-size:.72rem; color:var(--muted); margin-left:auto; font-weight:400; }
+    .docs-toggle { background:none; border:none; cursor:pointer; color:var(--muted); font-size:.7rem; padding:2px 6px; }
+    .docs-body { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px; margin-top:16px; }
+    .doc-item {
+      display:flex; flex-direction:column; gap:4px; padding:14px 16px;
+      border:1px solid rgba(255,255,255,.5); border-radius:14px; background:rgba(255,255,255,.35);
+      backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+      text-decoration:none; transition:border-color .15s,transform .15s,box-shadow .15s,background .15s;
+    }
+    .doc-item:hover { border-color:rgba(0,120,212,.4); background:rgba(255,255,255,.65); transform:translateY(-2px); box-shadow:0 10px 24px -10px rgba(0,90,200,.3); }
+    .doc-item-label { font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:var(--blue); }
+    .doc-item-title { font-size:.82rem; font-weight:600; color:var(--ink); }
+    .doc-item-desc { font-size:.74rem; color:var(--muted); line-height:1.5; }
+    .docs-note {
+      margin-top:14px; padding:12px 16px; background:rgba(255,255,255,.4); border-left:3px solid var(--blue);
+      border-radius:8px; font-size:.76rem; color:var(--muted); line-height:1.7;
+    }
+    .approx-note {
+      margin-top:8px; padding:12px 16px; background:rgba(255,255,255,.4); border-left:3px solid #cf1322;
+      border-radius:8px; font-size:.76rem; color:var(--muted); line-height:1.7;
+    }
+
+    /* ── controls ── */
+    .controls { max-width:1100px; margin:24px auto 0; padding:0 20px; }
+    .search-wrap { position:relative; margin-bottom:16px; }
+    .search-wrap svg { position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; }
+    #search {
+      width:100%; padding:14px 16px 14px 46px; border:1px solid var(--glass-border);
+      border-radius:var(--r); font-size:.94rem; font-family:inherit;
+      background:var(--glass); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+      outline:none; transition:border-color .2s,box-shadow .2s,background .2s;
+    }
+    #search:focus { border-color:var(--blue); background:rgba(255,255,255,.8); box-shadow:0 0 0 4px rgba(0,120,212,.14); }
+    #search::placeholder { color:var(--faint); }
+    .filter-row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
+    .filter-label { font-size:.68rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.8px; margin-right:6px; }
+    .fb {
+      padding:6px 14px; border-radius:20px; border:1px solid var(--glass-border);
+      background:var(--glass); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+      font-size:.76rem; font-weight:500; cursor:pointer;
+      font-family:inherit; color:var(--muted); white-space:nowrap; transition:all .15s;
+    }
+    .fb:hover { border-color:var(--blue); color:var(--blue); background:rgba(255,255,255,.75); }
+    .fb.active { background:linear-gradient(135deg,var(--blue),var(--slate)); border-color:transparent; color:#fff; box-shadow:0 6px 16px -6px rgba(0,90,200,.45); }
+
+    /* ── table ── */
+    .table-wrap { max-width:1100px; margin:20px auto 56px; padding:0 20px; }
+    .rc { font-size:.78rem; color:var(--muted); margin-bottom:12px; font-weight:400; letter-spacing:.1px; }
+    .rc span { color:var(--blue); font-weight:700; }
+    table {
+      width:100%; border-collapse:separate; border-spacing:0;
+      background:var(--glass); backdrop-filter:blur(20px) saturate(160%); -webkit-backdrop-filter:blur(20px) saturate(160%);
+      border:1px solid var(--glass-border); border-radius:var(--r); box-shadow:var(--shadow); overflow:hidden;
+    }
+    thead tr { background:rgba(255,255,255,.35); }
+    th {
+      padding:13px 14px; text-align:left; font-size:.66rem; font-weight:700;
+      text-transform:uppercase; letter-spacing:1px; color:var(--muted);
+      border-bottom:1px solid var(--glass-border); white-space:nowrap; cursor:pointer; user-select:none; transition:color .15s;
+    }
+    th:hover { color:var(--blue); }
+    th.asc::after { content:' ▲'; font-size:.55rem; }
+    th.desc::after { content:' ▼'; font-size:.55rem; }
+    tbody tr { border-bottom:1px solid rgba(255,255,255,.45); transition:background .12s; }
+    tbody tr:last-child { border-bottom:none; }
+    tbody tr:hover { background:rgba(255,255,255,.5); }
+    td { padding:14px; vertical-align:top; font-size:.85rem; line-height:1.55; }
+
+    .en { font-weight:600; letter-spacing:.1px; }
+    .ja { font-family:'Meiryo UI',Meiryo,'Zen Kaku Gothic New','Noto Sans JP',sans-serif; font-weight:500; color:var(--ink); font-size:.9rem; }
+    .approx-badge {
+      display:inline-block; font-size:.62rem; font-weight:600; background:rgba(207,19,34,.08);
+      color:#cf1322; border:1px solid rgba(207,19,34,.25); border-radius:4px; padding:1px 5px;
+      margin-left:5px; vertical-align:middle; cursor:help;
+    }
+    .desc { color:var(--muted); font-size:.78rem; max-width:280px; line-height:1.6; }
+    .cat-tag {
+      display:inline-block; padding:3px 10px; border-radius:20px;
+      background:rgba(0,120,212,.08); border:1px solid rgba(0,120,212,.2); color:var(--blue); font-size:.66rem; font-weight:600; white-space:nowrap; letter-spacing:.2px;
+    }
+
+    .dl {
+      display:inline-flex; align-items:center; gap:4px; color:var(--blue);
+      text-decoration:none; font-size:.74rem; font-weight:500; padding:4px 10px;
+      border-radius:6px; border:1px solid rgba(0,120,212,.25); background:rgba(0,120,212,.06);
+      transition:all .15s; white-space:nowrap;
+    }
+    .dl:hover { background:linear-gradient(135deg,var(--blue),var(--slate)); color:#fff; border-color:transparent; }
+
+    .no-results { text-align:center; padding:60px 20px; color:var(--faint); display:none; }
+    mark { background:#fde68a; color:inherit; border-radius:2px; padding:0 1px; }
+
+    footer { text-align:center; padding:28px; font-size:.74rem; color:var(--muted); border-top:1px solid rgba(255,255,255,.5); }
+    footer a { color:var(--blue); text-decoration:none; }
+    footer a:hover { text-decoration:underline; }
+
+    /* buy me a coffee */
+    .bmc {
+      display:inline-flex; align-items:center; gap:7px; margin-top:14px;
+      padding:8px 18px; border-radius:24px;
+      background:rgba(255,221,0,.55); border:1px solid rgba(180,140,0,.35);
+      backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+      color:#5b4300 !important; font-size:.8rem; font-weight:600; text-decoration:none !important;
+      transition:transform .15s, box-shadow .15s, background .15s;
+    }
+    .bmc:hover { background:rgba(255,221,0,.8); transform:translateY(-2px); box-shadow:0 8px 20px -8px rgba(180,140,0,.5); text-decoration:none !important; }
+
+    @media(max-width:800px){ td:nth-child(5),th:nth-child(5){display:none} }
+    @media(max-width:640px){ td:nth-child(4),th:nth-child(4){display:none} }
+    @media(max-width:480px){ td:nth-child(3),th:nth-child(3){display:none} }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="white" stroke-width="1.8">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+    </svg>
+    <h1>Azure ロール翻訳ツール</h1>
+  </div>
+  <p>Azure Role Translator — English ↔ Japanese &nbsp;|&nbsp; ソース: Microsoft Learn 公式ドキュメント</p>
+  <div class="stats">
+    <div><div class="stat-n" id="tc">—</div><div class="stat-l">ロール数</div></div>
+    <div><div class="stat-n" id="cc">—</div><div class="stat-l">カテゴリ</div></div>
+  </div>
+</header>
+
+<!-- ── Documentation Links Panel ── -->
+<div class="docs-panel">
+  <div class="docs-card">
+    <div class="docs-card-header" onclick="toggleDocs()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <span class="docs-card-title">Azure RBAC 参考ドキュメント / Reference Docs</span>
+      <span class="docs-card-subtitle">クリックで開閉 / click to expand</span>
+      <button class="docs-toggle" id="docs-toggle-btn">▼</button>
+    </div>
+    <div id="docs-body" class="docs-body">
+      <a class="doc-item" href="https://learn.microsoft.com/ja-jp/azure/role-based-access-control/overview" target="_blank" rel="noopener">
+        <span class="doc-item-label">概要</span>
+        <span class="doc-item-title">Azure RBAC とは</span>
+        <span class="doc-item-desc">ロールベースのアクセス制御の基本概念・しくみ・用語の解説</span>
+      </a>
+      <a class="doc-item" href="https://learn.microsoft.com/ja-jp/azure/azure-resource-manager/management/control-plane-and-data-plane" target="_blank" rel="noopener">
+        <span class="doc-item-label">重要概念</span>
+        <span class="doc-item-title">コントロール プレーンとデータ プレーン</span>
+        <span class="doc-item-desc">管理操作 (コントロール) とデータ操作 (データ) の違いを解説。ロール選択の基本。</span>
+      </a>
+      <a class="doc-item" href="https://learn.microsoft.com/ja-jp/azure/role-based-access-control/built-in-roles" target="_blank" rel="noopener">
+        <span class="doc-item-label">ロール一覧</span>
+        <span class="doc-item-title">Azure 組み込みロール</span>
+        <span class="doc-item-desc">全組み込みロールの権限・ID・説明の公式一覧 (日本語)</span>
+      </a>
+      <a class="doc-item" href="https://learn.microsoft.com/ja-jp/azure/role-based-access-control/role-assignments-portal" target="_blank" rel="noopener">
+        <span class="doc-item-label">割り当て方法</span>
+        <span class="doc-item-title">Azure Portal でのロール割り当て</span>
+        <span class="doc-item-desc">Azure Portal (コンソール) を使ってロールを割り当てる手順</span>
+      </a>
+      <a class="doc-item" href="https://learn.microsoft.com/ja-jp/azure/role-based-access-control/custom-roles" target="_blank" rel="noopener">
+        <span class="doc-item-label">カスタムロール</span>
+        <span class="doc-item-title">Azure カスタム ロール</span>
+        <span class="doc-item-desc">組み込みロールでは要件を満たせない場合にカスタム ロールを作成する方法</span>
+      </a>
+      <a class="doc-item" href="https://learn.microsoft.com/ja-jp/azure/role-based-access-control/best-practices" target="_blank" rel="noopener">
+        <span class="doc-item-label">ベストプラクティス</span>
+        <span class="doc-item-title">Azure RBAC のベスト プラクティス</span>
+        <span class="doc-item-desc">最小権限の原則・ロール設計・アクセス管理のベスト プラクティス集</span>
+      </a>
+    </div>
+    <div class="docs-note">
+      <strong>このツールについて:</strong> このサイトは非公式の参照ツールです。Microsoft と提携・関連しておりません。翻訳・説明は Microsoft Learn 公式ドキュメントに基づいていますが、ロールの権限・可用性は変更される場合があります。アクセス制御の決定を行う前に必ず公式ドキュメントを確認してください。<br>
+      <strong>組み込みロールのみ:</strong> このツールは Azure RBAC の組み込みロールのみを対象としています。Microsoft Entra ID ロール (グローバル管理者など)、カスタム ロール、クラシック管理者ロールは含まれていません。
+    </div>
+    <div class="approx-note">
+      <strong>翻訳について:</strong> <span class="approx-badge" style="margin-left:0">※ 近似訳</span> マークのあるロールは、Microsoft の公式 Azure Portal UI に日本語名が存在しないか確認できないロールです。翻訳は Microsoft Learn ドキュメントまたは命名パターンから導出した近似値です。実際の Portal 表示と異なる場合があります。
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="search-wrap">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="search" id="search" placeholder="ロール名で検索 (英語・日本語) / Search role names…" autocomplete="off" aria-label="ロール名で検索 / Search role names"/>
+  </div>
+  <div class="filter-row">
+    <span class="filter-label">カテゴリ:</span>
+    <button class="fb active" data-cat="all">すべて</button>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <div class="rc"><span id="sc">—</span> 件表示 / roles shown</div>
+  <table id="tbl">
+    <thead>
+      <tr>
+        <th data-col="en">英語名 / English</th>
+        <th data-col="ja">日本語名 / Japanese</th>
+        <th data-col="cat">カテゴリ</th>
+        <th data-col="desc">説明</th>
+        <th>Docs</th>
+      </tr>
+    </thead>
+    <tbody id="tb"></tbody>
+  </table>
+  <div class="no-results" id="nr"><p>該当するロールが見つかりませんでした。<br>No roles matched your search.</p></div>
+</div>
+
+<footer>
+  ソース: <a href="https://learn.microsoft.com/ja-jp/azure/role-based-access-control/built-in-roles" target="_blank" rel="noopener">Microsoft Learn — Azure 組み込みロール (日本語)</a>
+  &nbsp;|&nbsp; <a href="https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles" target="_blank" rel="noopener">Azure Built-in Roles (English)</a>
+  &nbsp;|&nbsp; 非公式ツール — Microsoft と無関係
+  <br>
+  <a class="bmc" href="https://buymeacoffee.com/lacerise" target="_blank" rel="noopener">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>
+    コーヒーをおごる / Buy me a coffee
+  </a>
+</footer>
+
+<script>
+const BASE = "https://learn.microsoft.com/ja-jp/azure/role-based-access-control/built-in-roles/";
+
+// Microsoft Learn splits built-in roles across category sub-pages.
+// Map each category to its sub-page; a couple of roles live on a different
+// sub-page than their category suggests (see SUBPAGE_EXCEPTIONS).
+const SUBPAGE = {
+  "特権":"privileged", "コンピューティング":"compute", "ネットワーク":"networking",
+  "ストレージ":"storage", "Web・アプリ":"web-and-mobile", "コンテナー":"containers",
+  "データベース":"databases", "分析":"analytics", "AI・機械学習":"ai-machine-learning",
+  "IoT":"internet-of-things", "統合":"integration", "ID管理":"identity",
+  "セキュリティ":"security", "監視":"monitor", "DevOps":"devops",
+  "管理・ガバナンス":"management-and-governance", "移行":"migration"
+};
+const SUBPAGE_EXCEPTIONS = {
+  "reader":"general",                    // Reader is documented under General
+  "services-hub-operator":"integration"  // Services Hub Operator is under Integration
+};
+const roleUrl = r => `${BASE}${SUBPAGE_EXCEPTIONS[r.anchor] || SUBPAGE[r.cat]}#${r.anchor}`;
+
+// ── Roles with approximate/unofficial Japanese translations ──
+// These roles have no confirmed Japanese name in the Azure Portal UI.
+// Translations are derived from Microsoft Learn docs or naming patterns.
+const APPROX = new Set([
+  "AcrPull","AcrPush","AcrDelete","AcrImageSigner","AcrQuarantineReader","AcrQuarantineWriter",
+  "Foundry Owner","Foundry Project Manager","Foundry Account Owner","Foundry User",
+  "Azure Arc Kubernetes Admin","Azure Arc Kubernetes Viewer","Azure Arc Kubernetes Writer",
+  "Azure Arc Kubernetes Cluster Admin","Azure Arc Enabled Kubernetes Cluster User Role",
+  "Azure Container Storage Contributor","Azure Container Storage Operator","Azure Container Storage Owner",
+  "Defender Kubernetes API Access","Azure File Sync Reader",
+  "CosmosRestoreOperator","Semantic Reranker User",
+  "Durable Task Data Contributor","Durable Task Data Reader","Durable Task Worker",
+  "FHIR SMART User","FHIR Data Bulk Operator",
+  "Healthcare Agent Admin","Healthcare Agent Editor","Healthcare Agent Reader",
+  "Azure AI Enterprise Network Connection Approver","Azure AI Developer",
+  "Carbon Optimization Reader",
+  "Azure Center for SAP Solutions Administrator","Azure Center for SAP Solutions Reader",
+  "Azure Center for SAP Solutions Service Role",
+  "Azure Managed Redis Contributor","Azure Managed Redis Reader",
+  "Azure Connected SQL Server Onboarding",
+  "Azure Connected Machine Resource Manager",
+  "Chaos Studio Reader","Chaos Studio Target Contributor",
+  "Playwright Workspace Contributor","Playwright Workspace Owner","Playwright Workspace Reader",
+  "DevCenter Dev Box User","DevCenter Project Admin","Deployment Environments User",
+  "Essential Machine Management Administrator",
+  "Container Apps Contributor","Container Apps Operator",
+  "Container Apps Jobs Contributor","Container Apps Jobs Operator",
+  "Container Registry Repository Contributor","Container Registry Repository Reader","Container Registry Repository Writer",
+  "Service Fabric Cluster Contributor","Service Fabric Managed Cluster Contributor",
+  "Azure Kubernetes Fleet Manager Contributor Role","Azure Kubernetes Fleet Manager RBAC Admin",
+  "Azure Kubernetes Fleet Manager RBAC Cluster Admin","Azure Kubernetes Fleet Manager RBAC Reader",
+  "Azure Kubernetes Fleet Manager RBAC Writer",
+  "Azure Kubernetes Service Arc Cluster Admin Role","Azure Kubernetes Service Arc Cluster User Role",
+  "Azure Kubernetes Service Arc Contributor Role",
+  "Azure Spring Apps Connect Role","Azure Spring Apps Remote Debugging Role",
+  "Web PubSub Service Owner","Web PubSub Service Reader",
+  "SignalR/Web PubSub Contributor",
+  "Azure API Center Compliance Manager","Azure API Center Data Reader",
+  "Azure API Center Service Contributor","Azure API Center Service Reader",
+  "Logic Apps Standard Contributor (Preview)","Logic Apps Standard Developer (Preview)",
+  "Logic Apps Standard Operator (Preview)","Logic Apps Standard Reader (Preview)",
+  "DeID Batch Data Owner","DeID Batch Data Reader","DeID Data Owner","DeID Realtime Data User",
+  "FHIR Data Bulk Operator","FHIR SMART User",
+  "Azure Device Registry Contributor","Azure Device Registry Credentials Contributor",
+  "Azure IoT Operations Administrator","Azure IoT Operations Onboarding",
+  "Firmware Analysis Admin","Firmware Analysis Reader","Firmware Analysis User",
+  "Grafana Limited Viewer","Azure Managed Grafana Workspace Contributor",
+  "Monitoring Policy Contributor","Application Insights Snapshot Debugger",
+  "Log Analytics Data Reader",
+  "Elastic SAN Owner","Elastic SAN Reader","Elastic SAN Volume Group Owner","Elastic SAN Network Admin",
+  "Storage Actions Blob Data Operator","Storage Actions Contributor","Storage Actions Task Assignment Contributor",
+  "Storage Connector Contributor","Storage DataShare Contributor",
+  "Storage File Data SMB MI Admin","Storage File Delegator","Storage Queue Delegator","Storage Table Delegator",
+  "Defender for Storage Data Scanner","Azure File Sync Administrator",
+  "Backup MUA Admin","Backup MUA Operator",
+  "Azure Spring Apps Application Configuration Service Config File Pattern Reader Role",
+  "Azure Spring Apps Application Configuration Service Log Reader Role",
+  "Azure Spring Apps Job Log Reader Role","Azure Spring Apps Spring Cloud Gateway Log Reader Role",
+  "Azure Migrate Owner",
+  "Managed Application Publisher Operator","Services Hub Operator",
+  "Advisor Recommendations Contributor (Assessments and Reviews)",
+  "Hierarchy Settings Administrator","Managed Services Registration Assignment Delete Role",
+  "Policy Insights Data Writer (Preview)","Quota Request Operator",
+  "HDInsight on AKS Cluster Admin","HDInsight on AKS Cluster Pool Admin",
+  "Schema Registry Contributor","Schema Registry Reader","Stream Analytics Query Tester",
+  "Azure Resource Notifications System Topics Subscriber",
+  "EventGrid TopicSpaces Publisher","EventGrid TopicSpaces Subscriber",
+  "Azure Relay Listener","Azure Relay Owner","Azure Relay Sender",
+  "BizTalk Contributor","Integration Service Environment Contributor","Integration Service Environment Developer",
+  "API Management Developer Portal Content Editor",
+  "API Management Service Workspace API Developer","API Management Service Workspace API Product Manager",
+  "API Management Workspace API Developer","API Management Workspace API Product Manager",
+  "API Management Workspace Contributor","API Management Workspace Reader",
+  "Cognitive Services Immersive Reader User","Cognitive Services QnA Maker Editor","Cognitive Services QnA Maker Reader",
+  "Cognitive Services Face Recognizer","Cognitive Services Usages Reader",
+  "Cognitive Services Metrics Advisor Administrator","Cognitive Services Metrics Advisor User",
+  "AzureML Metrics Writer (preview)","AzureML Registry User",
+  "Search Index Data Contributor","Search Index Data Reader",
+  "VM Restore Operator","Windows 365 Network Interface Contributor","Windows 365 Network User",
+  "Compute Fleet Contributor","Compute Gallery Artifacts Publisher","Compute Gallery Image Reader","Compute Gallery Sharing Admin",
+  "Quantum Workspace Data Contributor","Data Operator for Managed Disks",
+  "Azure Arc VMware VM Contributor","Virtual Machine Data Access Administrator (preview)",
+  "Virtual Machine Local User Login","Desktop Virtualization Power On Contributor",
+  "Desktop Virtualization Power On Off Contributor","Desktop Virtualization Virtual Machine Contributor",
+  "Disk Pool Operator","Windows Admin Center Administrator Login",
+  "Reservations Administrator"
+]);
+
+
+// ── Role data ──
+// [englishName, japaneseName, category, description, anchor]
+const RAW = [
+  // 特権
+  ["Owner","所有者","特権","すべてのリソースへのフル アクセス権と、Azure RBAC でのロール割り当て権限を含む。","owner"],
+  ["Contributor","共同作成者","特権","すべてのリソースを管理できる。Azure RBAC でのロール割り当て、Blueprint 割り当て、イメージ ギャラリーの共有は不可。","contributor"],
+  ["Reader","閲覧者","特権","すべてのリソースを表示できるが、変更は不可。","reader"],
+  ["User Access Administrator","ユーザー アクセス管理者","特権","Azure リソースへのユーザー アクセスを管理する。","user-access-administrator"],
+  ["Role Based Access Control Administrator","ロール ベースのアクセス制御管理者","特権","Azure RBAC を使用して Azure リソースへのアクセスを管理する。","role-based-access-control-administrator"],
+  ["Reservations Administrator","予約管理者","特権","テナント内のすべての予約を読み取り・管理できる。","reservations-administrator"],
+  // コンピューティング
+  ["Virtual Machine Contributor","仮想マシン共同作成者","コンピューティング","VM を作成・管理できる。接続先の VNet やストレージへのアクセスは不可。","virtual-machine-contributor"],
+  ["Virtual Machine Administrator Login","仮想マシン管理者ログイン","コンピューティング","ポータルで VM を表示し、管理者としてログインする。","virtual-machine-administrator-login"],
+  ["Virtual Machine User Login","仮想マシン ユーザー ログイン","コンピューティング","ポータルで VM を表示し、通常ユーザーとしてログインする。","virtual-machine-user-login"],
+  ["Virtual Machine Local User Login","仮想マシン ローカル ユーザー ログイン","コンピューティング","Arc サーバーに構成されたローカル ユーザーとしてログインする。","virtual-machine-local-user-login"],
+  ["Virtual Machine Data Access Administrator (preview)","仮想マシン データ アクセス管理者 (プレビュー)","コンピューティング","VM へのロール割り当てを追加・削除してアクセスを管理する。","virtual-machine-data-access-administrator-preview"],
+  ["Classic Virtual Machine Contributor","クラシック仮想マシン共同作成者","コンピューティング","クラシック VM を管理する。接続先の VNet やストレージへのアクセスは不可。","classic-virtual-machine-contributor"],
+  ["Disk Backup Reader","ディスク バックアップ リーダー","コンピューティング","ディスク バックアップを実行するためのバックアップ コンテナーへのアクセス許可を提供する。","disk-backup-reader"],
+  ["Disk Restore Operator","ディスク復元オペレーター","コンピューティング","ディスク復元を実行するためのバックアップ コンテナーへのアクセス許可を提供する。","disk-restore-operator"],
+  ["Disk Snapshot Contributor","ディスク スナップショット共同作成者","コンピューティング","ディスク スナップショットを管理するためのバックアップ コンテナーへのアクセス許可を提供する。","disk-snapshot-contributor"],
+  ["Disk Pool Operator","ディスク プール オペレーター","コンピューティング","ディスク プールに追加されたディスクを管理するための StoragePool リソース プロバイダーへのアクセス許可。","disk-pool-operator"],
+  ["Compute Fleet Contributor","コンピューティング フリート共同作成者","コンピューティング","Compute Fleet リソースを管理できる。","compute-fleet-contributor"],
+  ["Compute Gallery Artifacts Publisher","コンピュートギャラリー Artifacts 出版社","コンピューティング","ギャラリー成果物を発行するためのロール。","compute-gallery-artifacts-publisher"],
+  ["Compute Gallery Image Reader","コンピューティング ギャラリー イメージ閲覧者","コンピューティング","ギャラリー イメージを読み取るためのロール。","compute-gallery-image-reader"],
+  ["Compute Gallery Sharing Admin","コンピューティング ギャラリー共有の管理者","コンピューティング","ギャラリーを別のサブスクリプション/テナントまたはパブリックに共有できる。","compute-gallery-sharing-admin"],
+  ["Data Operator for Managed Disks","Data 演算子 for Managed Disks","コンピューティング","SAS URI と Azure AD 認証を使用して、空のマネージド ディスクへのデータのアップロード/エクスポートを提供する。","data-operator-for-managed-disks"],
+  ["Desktop Virtualization Contributor","デスクトップ仮想化の共同作成者","コンピューティング","Desktop Virtualization の共同作成者。","desktop-virtualization-contributor"],
+  ["Desktop Virtualization Reader","デスクトップ仮想化閲覧者","コンピューティング","Desktop Virtualization の閲覧者。","desktop-virtualization-reader"],
+  ["Desktop Virtualization Host Pool Contributor","デスクトップ仮想化ホスト プール共同作成者","コンピューティング","Desktop Virtualization ホスト プールの共同作成者。","desktop-virtualization-host-pool-contributor"],
+  ["Desktop Virtualization Host Pool Reader","デスクトップ仮想化ホスト プール リーダー","コンピューティング","Desktop Virtualization ホスト プールの閲覧者。","desktop-virtualization-host-pool-reader"],
+  ["Desktop Virtualization Application Group Contributor","デスクトップ仮想化アプリケーショングループの貢献者","コンピューティング","Desktop Virtualization アプリケーション グループの共同作成者。","desktop-virtualization-application-group-contributor"],
+  ["Desktop Virtualization Application Group Reader","デスクトップ仮想化アプリケーショングループリーダー","コンピューティング","Desktop Virtualization アプリケーション グループの閲覧者。","desktop-virtualization-application-group-reader"],
+  ["Desktop Virtualization User","デスクトップ仮想化ユーザー","コンピューティング","アプリケーション グループ内のアプリケーションを使用できるエンド ユーザー向けロール。","desktop-virtualization-user"],
+  ["Desktop Virtualization Session Host Operator","デスクトップ仮想化セッションホストオペレーター","コンピューティング","Desktop Virtualization セッション ホストのオペレーター。","desktop-virtualization-session-host-operator"],
+  ["Desktop Virtualization User Session Operator","デスクトップ仮想化ユーザーセッション管理者","コンピューティング","Desktop Virtualization ユーザー セッションのオペレーター。","desktop-virtualization-user-session-operator"],
+  ["Desktop Virtualization Workspace Contributor","デスクトップ仮想化ワークスペース共同作成者","コンピューティング","Desktop Virtualization ワークスペースの共同作成者。","desktop-virtualization-workspace-contributor"],
+  ["Desktop Virtualization Workspace Reader","デスクトップ仮想化ワークスペース閲覧者","コンピューティング","Desktop Virtualization ワークスペースの閲覧者。","desktop-virtualization-workspace-reader"],
+  ["Desktop Virtualization Power On Contributor","デスクトップ仮想化起動の共同作成者","コンピューティング","Azure Virtual Desktop リソース プロバイダーに VM を起動するアクセス許可を提供する。","desktop-virtualization-power-on-contributor"],
+  ["Desktop Virtualization Power On Off Contributor","デスクトップ仮想化起動停止の共同作成者","コンピューティング","Azure Virtual Desktop リソース プロバイダーに VM を起動・停止するアクセス許可を提供する。","desktop-virtualization-power-on-off-contributor"],
+  ["Desktop Virtualization Virtual Machine Contributor","デスクトップ仮想化仮想マシンの共同作成者","コンピューティング","Azure Virtual Desktop リソース プロバイダーに VM の作成・削除・更新・起動・停止のアクセス許可を提供する。","desktop-virtualization-virtual-machine-contributor"],
+  ["Windows Admin Center Administrator Login","Windows Admin Center Administrator Login","コンピューティング","Windows Admin Center を使用してリソースの OS を管理者として管理できる。","windows-admin-center-administrator-login"],
+  ["Windows 365 Network Interface Contributor","Windows 365 ネットワーク インターフェイス共同作成者","コンピューティング","Windows 365 が必要なネットワーク リソースをプロビジョニングし、Microsoft ホスト VM をネットワーク インターフェイスに参加させるために使用する。","windows-365-network-interface-contributor"],
+  ["Windows 365 Network User","Windows 365 ネットワーク ユーザー","コンピューティング","Windows 365 が仮想ネットワークを読み取り、指定された仮想ネットワークに参加するために使用する。","windows-365-network-user"],
+  ["VM Restore Operator","VM 復元オペレーター","コンピューティング","VM 復元中にリソースを作成・削除する。","vm-restore-operator"],
+  ["Azure Arc VMware VM Contributor","Azure Arc VMware VM 共同作成者","コンピューティング","すべての VM アクションを実行するためのアクセス許可を持つ Arc VMware VM 共同作成者。","azure-arc-vmware-vm-contributor"],
+  ["Quantum Workspace Data Contributor","Quantum ワークスペースのデータ共同作成者","コンピューティング","ジョブおよびその他のワークスペース データを作成・読み取り・変更できる。","quantum-workspace-data-contributor"],
+  // ネットワーク
+  ["Network Contributor","ネットワーク共同作成者","ネットワーク","ネットワークを管理できる。仮想マシンへのアクセスは不可。","network-contributor"],
+  ["DNS Zone Contributor","DNS ゾーン共同作成者","ネットワーク","Azure DNS の DNS ゾーンとレコード セットを管理できる。アクセス制御の管理は不可。","dns-zone-contributor"],
+  ["Private DNS Zone Contributor","プライベート DNS Zone Contributor","ネットワーク","プライベート DNS ゾーン リソースを管理できる。リンク先の仮想ネットワークは管理不可。","private-dns-zone-contributor"],
+  ["Traffic Manager Contributor","トラフィックマネージャー 共同作成者","ネットワーク","Traffic Manager プロファイルを管理できる。アクセス制御の管理は不可。","traffic-manager-contributor"],
+  ["Classic Network Contributor","クラシック ネットワーク共同作成者","ネットワーク","クラシック ネットワークを管理できる。アクセスは不可。","classic-network-contributor"],
+  ["CDN Endpoint Contributor","CDN エンドポイント共同作成者","ネットワーク","CDN エンドポイントを管理できる。アクセス権限の付与は不可。","cdn-endpoint-contributor"],
+  ["CDN Endpoint Reader","CDN エンドポイント リーダー","ネットワーク","CDN エンドポイントを表示できるが、変更は不可。","cdn-endpoint-reader"],
+  ["CDN Profile Contributor","CDN プロファイル共同作成者","ネットワーク","CDN および Azure Front Door プロファイルとそのエンドポイントを管理できる。","cdn-profile-contributor"],
+  ["CDN Profile Reader","CDN プロファイル 閲覧者","ネットワーク","CDN プロファイルとそのエンドポイントを表示できるが、変更は不可。","cdn-profile-reader"],
+  ["Azure Front Door Domain Contributor","Azure Front Door ドメイン共同作成者","ネットワーク","Azure Front Door ドメインを管理できる。他のユーザーへのアクセス付与は不可。","azure-front-door-domain-contributor"],
+  ["Azure Front Door Domain Reader","Azure Front Door ドメイン リーダー","ネットワーク","Azure Front Door ドメインを表示できるが、変更は不可。","azure-front-door-domain-reader"],
+  ["Azure Front Door Profile Reader","Azure Front Door プロファイル リーダー","ネットワーク","AFD Standard/Premium プロファイルとエンドポイントを表示できるが、変更は不可。","azure-front-door-profile-reader"],
+  ["Azure Front Door Secret Contributor","Azure Front Door シークレット共同作成者","ネットワーク","Azure Front Door シークレットを管理できる。アクセス権限の付与は不可。","azure-front-door-secret-contributor"],
+  ["Azure Front Door Secret Reader","Azure Front Door シークレット リーダー","ネットワーク","Azure Front Door シークレットを表示できるが、変更は不可。","azure-front-door-secret-reader"],
+  // ストレージ
+  ["Storage Account Contributor","ストレージ アカウント共同作成者","ストレージ","ストレージ アカウントの管理が可能。共有キー認証でデータにアクセスするためのアカウント キーへのアクセスを提供する。","storage-account-contributor"],
+  ["Storage Account Key Operator Service Role","ストレージ アカウント キー オペレーターのサービス ロール","ストレージ","ストレージ アカウント アクセス キーの一覧表示と再生成を許可する。","storage-account-key-operator-service-role"],
+  ["Storage Account Backup Contributor","ストレージ アカウントのバックアップ共同作成者","ストレージ","Azure Backup を使用してストレージ アカウントのバックアップと復元操作を実行できる。","storage-account-backup-contributor"],
+  ["Reader and Data Access","リーダーとデータ アクセス","ストレージ","すべてを表示できるが、ストレージ アカウントの削除・作成は不可。","reader-and-data-access"],
+  ["Storage Blob Data Owner","ストレージ BLOB データの所有者","ストレージ","Azure Storage BLOB コンテナーとデータへのフル アクセス (POSIX アクセス制御の割り当てを含む)。","storage-blob-data-owner"],
+  ["Storage Blob Data Contributor","ストレージ BLOB データの共同作成者","ストレージ","Azure Storage コンテナーと BLOB の読み取り、書き込み、削除。","storage-blob-data-contributor"],
+  ["Storage Blob Data Reader","ストレージ BLOB データの閲覧者","ストレージ","Azure Storage コンテナーと BLOB の読み取りと一覧表示。","storage-blob-data-reader"],
+  ["Storage Blob Delegator","Storage BLOB の委任者","ストレージ","Azure AD 資格情報で署名されたコンテナーまたは BLOB のユーザー委任 SAS を取得する。","storage-blob-delegator"],
+  ["Storage File Data Privileged Contributor","ストレージ ファイル データの権限付き共同作成者","ストレージ","既存の ACL/NTFS アクセス許可を上書きして Azure ファイル共有のファイル/ディレクトリの読み取り・書き込み・削除・ACL 変更を許可する。","storage-file-data-privileged-contributor"],
+  ["Storage File Data Privileged Reader","ストレージ ファイル データの権限付き閲覧者","ストレージ","既存の ACL/NTFS アクセス許可を上書きして Azure ファイル共有のファイル/ディレクトリへの読み取りアクセスを許可する。","storage-file-data-privileged-reader"],
+  ["Storage File Data SMB Admin","ストレージ ファイル データ SMB 管理者","ストレージ","SMB 経由でエンド ユーザーにストレージ アカウント キーと同等の管理アクセスを許可する。","storage-file-data-smb-admin"],
+  ["Storage File Data SMB Share Contributor","ストレージ ファイル データの SMB 共有の共同作成者","ストレージ","SMB 経由での Azure ファイル共有のファイル/ディレクトリの読み取り、書き込み、削除。","storage-file-data-smb-share-contributor"],
+  ["Storage File Data SMB Share Elevated Contributor","ストレージ ファイル データの SMB 共有の昇格された共同作成者","ストレージ","SMB 経由での Azure ファイル共有の ACL の読み取り・書き込み・削除・変更。","storage-file-data-smb-share-elevated-contributor"],
+  ["Storage File Data SMB Share Reader","ストレージ ファイル データの SMB 共有の閲覧者","ストレージ","SMB 経由での Azure ファイル共有のファイルへの読み取りアクセス。","storage-file-data-smb-share-reader"],
+  ["Storage Queue Data Contributor","ストレージ キュー データ共同作成者","ストレージ","Azure Storage キューおよびキュー メッセージの読み取り、書き込み、削除。","storage-queue-data-contributor"],
+  ["Storage Queue Data Message Processor","ストレージ キュー データのメッセージ プロセッサ","ストレージ","Azure Storage キューのメッセージをピーク、取得、削除する。","storage-queue-data-message-processor"],
+  ["Storage Queue Data Message Sender","ストレージ キュー データ メッセージ送信者","ストレージ","Azure Storage キューにメッセージを追加する。","storage-queue-data-message-sender"],
+  ["Storage Queue Data Reader","ストレージ キュー データ閲覧者","ストレージ","Azure Storage キューとキュー メッセージの読み取りと一覧表示。","storage-queue-data-reader"],
+  ["Storage Table Data Contributor","ストレージ テーブル データ共同作成者","ストレージ","Azure Storage テーブルとエンティティの読み取り、書き込み、削除アクセス。","storage-table-data-contributor"],
+  ["Storage Table Data Reader","ストレージ テーブル データ閲覧者","ストレージ","Azure Storage テーブルとエンティティへの読み取りアクセス。","storage-table-data-reader"],
+  ["Backup Contributor","バックアップ共同作成者","ストレージ","バックアップ サービスを管理できる。コンテナーの作成や他者へのアクセス付与は不可。","backup-contributor"],
+  ["Backup Operator","バックアップ オペレーター","ストレージ","バックアップの削除・コンテナー作成・他者へのアクセス付与を除くバックアップ サービスを管理できる。","backup-operator"],
+  ["Backup Reader","バックアップ リーダー","ストレージ","バックアップ サービスを表示できるが、変更は不可。","backup-reader"],
+  ["Avere Contributor","Avere 共同作成者","ストレージ","Avere vFXT クラスターを作成・管理できる。","avere-contributor"],
+  ["Avere Operator","Avere オペレーター","ストレージ","Avere vFXT クラスターの管理に使用される。","avere-operator"],
+  ["Classic Storage Account Contributor","クラシック ストレージ アカウント共同作成者","ストレージ","クラシック ストレージ アカウントを管理できる。アクセスは不可。","classic-storage-account-contributor"],
+  ["Data Box Contributor","Data Box 共同作成者","ストレージ","他者へのアクセス付与を除く Data Box サービスのすべてを管理できる。","data-box-contributor"],
+  ["Data Box Reader","Data Box 閲覧者","ストレージ","注文の作成・変更・他者へのアクセス付与を除く Data Box サービスを管理できる。","data-box-reader"],
+  ["Data Lake Analytics Developer","Data Lake Analytics 開発者","ストレージ","Data Lake Analytics アカウントの作成・削除を除く、自分のジョブを送信・監視・管理できる。","data-lake-analytics-developer"],
+  ["Elastic SAN Owner","Elastic SAN 所有者","ストレージ","ネットワーク セキュリティ ポリシーの変更を含む Azure Elastic SAN のすべてのリソースへのフル アクセス。","elastic-san-owner"],
+  ["Elastic SAN Reader","Elastic SAN 閲覧者","ストレージ","Azure Elastic SAN のコントロール パス読み取りアクセス。","elastic-san-reader"],
+  ["Elastic SAN Volume Group Owner","Elastic SAN ボリューム グループの所有者","ストレージ","Azure Elastic SAN のボリューム グループへのフル アクセス。","elastic-san-volume-group-owner"],
+  ["Elastic SAN Network Admin","Elastic SAN ネットワーク管理者","ストレージ","SAN リソースのプライベート エンドポイントを作成し、SAN リソースを読み取るアクセス許可。","elastic-san-network-admin"],
+  ["Defender for Storage Data Scanner","Defender for Storage データ スキャナー","ストレージ","BLOB の読み取りとインデックス タグの更新のためのアクセス。Defender for Storage のデータ スキャナーによって使用される。","defender-for-storage-data-scanner"],
+  ["Azure File Sync Administrator","Azure File Sync 管理者","ストレージ","すべての Azure File Sync (Storage Sync Service) リソースを管理するためのフル アクセスを提供する。","azure-file-sync-administrator"],
+  // Web・アプリ
+  ["Website Contributor","Web サイトの共同作成者","Web・アプリ","Web サイトを管理できる。Web プランは管理不可。Azure RBAC でのロール割り当ては不可。","website-contributor"],
+  ["Web Plan Contributor","ウェブプラン共同作成者","Web・アプリ","Web サイトの Web プランを管理できる。Azure RBAC でのロール割り当ては不可。","web-plan-contributor"],
+  ["SignalR AccessKey Reader","SignalR AccessKey 閲覧者","Web・アプリ","SignalR Service アクセス キーを読み取る。","signalr-accesskey-reader"],
+  ["SignalR App Server","SignalR アプリ サーバー","Web・アプリ","AAD 認証オプションを使用してアプリ サーバーが SignalR Service にアクセスできるようにする。","signalr-app-server"],
+  ["SignalR REST API Owner","SignalR REST API 所有者","Web・アプリ","Azure SignalR Service REST API へのフル アクセス。","signalr-rest-api-owner"],
+  ["SignalR REST API Reader","SignalR REST API 閲覧者","Web・アプリ","Azure SignalR Service REST API への読み取り専用アクセス。","signalr-rest-api-reader"],
+  ["SignalR Service Owner","SignalR Service Owner","Web・アプリ","Azure SignalR Service REST API へのフル アクセス。","signalr-service-owner"],
+  ["SignalR/Web PubSub Contributor","SignalR/Web PubSub 共同作成者","Web・アプリ","SignalR サービス リソースを作成・読み取り・更新・削除する。","signalrweb-pubsub-contributor"],
+  ["Web PubSub Service Owner","Web PubSub サービス所有者","Web・アプリ","Azure Web PubSub Service REST API へのフル アクセス。","web-pubsub-service-owner"],
+  ["Web PubSub Service Reader","Web PubSub サービスの閲覧者","Web・アプリ","Azure Web PubSub Service REST API への読み取り専用アクセス。","web-pubsub-service-reader"],
+  ["Azure Maps Data Contributor","Azure Maps データ共同作成者","Web・アプリ","Azure Maps アカウントのマップ関連データへの読み取り・書き込み・削除アクセスを許可する。","azure-maps-data-contributor"],
+  ["Azure Maps Data Reader","Azure Maps データ リーダー","Web・アプリ","Azure Maps アカウントのマップ関連データへの読み取りアクセスを許可する。","azure-maps-data-reader"],
+  ["Azure Spring Cloud Config Server Contributor","Azure Spring Cloud Config Server Contributor","Web・アプリ","Azure Spring Cloud Config Server への読み取り・書き込み・削除アクセスを許可する。","azure-spring-cloud-config-server-contributor"],
+  ["Azure Spring Cloud Config Server Reader","Azure Spring Cloud Config Server Reader","Web・アプリ","Azure Spring Cloud Config Server への読み取りアクセスを許可する。","azure-spring-cloud-config-server-reader"],
+  ["Azure Spring Cloud Data Reader","Azure Spring Cloud Data Reader","Web・アプリ","Azure Spring Cloud データへの読み取りアクセスを許可する。","azure-spring-cloud-data-reader"],
+  ["Azure Spring Cloud Service Registry Contributor","Azure Spring Cloud Service Registry Contributor","Web・アプリ","Azure Spring Cloud サービス レジストリへの読み取り・書き込み・削除アクセスを許可する。","azure-spring-cloud-service-registry-contributor"],
+  ["Azure Spring Cloud Service Registry Reader","Azure Spring Cloud サービス レジストリ リーダー","Web・アプリ","Azure Spring Cloud サービス レジストリへの読み取りアクセスを許可する。","azure-spring-cloud-service-registry-reader"],
+  // コンテナー
+  ["AcrPull","AcrPull (アクリプル)","コンテナー","コンテナー レジストリからイメージをプルする。","acrpull"],
+  ["AcrPush","AcrPush (アクラプッシュ)","コンテナー","コンテナー レジストリにイメージをプッシュする、またはプルする。","acrpush"],
+  ["AcrDelete","AcrDelete","コンテナー","コンテナー レジストリからリポジトリ、タグ、またはマニフェストを削除する。","acrdelete"],
+  ["AcrImageSigner","AcrImageSigner","コンテナー","コンテンツの信頼が有効な Azure Container Registry のイメージに署名する。","acrimagesigner"],
+  ["AcrQuarantineReader","AcrQuarantineReader (アクワランティンリーダー)","コンテナー","検疫されたイメージをコンテナー レジストリからプルする。","acrquarantinereader"],
+  ["AcrQuarantineWriter","AcrQuarantineWriter (アクワランティンライター)","コンテナー","検疫されたイメージをコンテナー レジストリにプッシュする、またはプルする。","acrquarantinewriter"],
+  ["Azure Kubernetes Service Cluster Admin Role","Azure Kubernetes Service クラスター管理者ロール","コンテナー","クラスター管理者の資格情報アクションを一覧表示する。","azure-kubernetes-service-cluster-admin-role"],
+  ["Azure Kubernetes Service Cluster User Role","Azure Kubernetes Service クラスター ユーザー ロール","コンテナー","クラスター ユーザーの資格情報アクションを一覧表示する。","azure-kubernetes-service-cluster-user-role"],
+  ["Azure Kubernetes Service Contributor Role","Azure Kubernetes Service 共同作成者ロール","コンテナー","Azure Kubernetes Service クラスターへの読み取り・書き込みアクセスを許可する。","azure-kubernetes-service-contributor-role"],
+  ["Azure Kubernetes Service RBAC Admin","Azure Kubernetes Service RBAC 管理者","コンテナー","クラスター/名前空間のすべてのリソースを管理できる (リソース クォータと名前空間の更新を除く)。","azure-kubernetes-service-rbac-admin"],
+  ["Azure Kubernetes Service RBAC Cluster Admin","Azure Kubernetes Service RBAC クラスター管理者","コンテナー","クラスター内のすべてのリソースを管理できる。","azure-kubernetes-service-rbac-cluster-admin"],
+  ["Azure Kubernetes Service RBAC Reader","Azure Kubernetes Service RBAC 閲覧者","コンテナー","名前空間内のほとんどのオブジェクトを表示できる。シークレットは表示不可。","azure-kubernetes-service-rbac-reader"],
+  ["Azure Kubernetes Service RBAC Writer","Azure Kubernetes Service RBAC ライター","コンテナー","名前空間内のほとんどのオブジェクトへの読み取り・書き込みアクセス。","azure-kubernetes-service-rbac-writer"],
+  ["Azure Kubernetes Service Cluster Monitoring User","Azure Kubernetes Service クラスター監視ユーザー","コンテナー","クラスター監視ユーザー資格情報アクションを一覧表示する。","azure-kubernetes-service-cluster-monitoring-user"],
+  ["Azure Arc Kubernetes Admin","Azure Arc Kubernetes Admin","コンテナー","クラスター/名前空間のすべてのリソースを管理できる (リソース クォータと名前空間の更新・削除を除く)。","azure-arc-kubernetes-admin"],
+  ["Azure Arc Kubernetes Cluster Admin","Azure Arc Kubernetes クラスター管理者","コンテナー","クラスター内のすべてのリソースを管理できる。","azure-arc-kubernetes-cluster-admin"],
+  ["Azure Arc Kubernetes Viewer","Azure Arc Kubernetes Viewer","コンテナー","シークレットを除く、クラスター/名前空間のすべてのリソースを表示できる。","azure-arc-kubernetes-viewer"],
+  ["Azure Arc Kubernetes Writer","Azure Arc Kubernetes Writer","コンテナー","(クラスター) ロールと (クラスター) ロール バインドを除く、クラスター/名前空間のすべてを更新できる。","azure-arc-kubernetes-writer"],
+  ["Azure Arc Enabled Kubernetes Cluster User Role","Azure Arc 有効な Kubernetes クラスター ユーザー ロール","コンテナー","クラスター ユーザー資格情報アクションを一覧表示する。","azure-arc-enabled-kubernetes-cluster-user-role"],
+  ["Azure Container Instances Contributor Role","Azure Container Instances 共同作成者ロール","コンテナー","Azure Container Instances が提供するコンテナー グループへの読み取り/書き込みアクセスを許可する。","azure-container-instances-contributor-role"],
+  ["Azure Container Storage Contributor","Azure Container Storage Contributor","コンテナー","Azure Container Storage をインストールし、そのストレージ リソースを管理する。","azure-container-storage-contributor"],
+  ["Azure Container Storage Operator","Azure Container Storage Operator","コンテナー","マネージド ID が Azure Container Storage の操作を実行できるようにする。","azure-container-storage-operator"],
+  ["Azure Container Storage Owner","Azure Container Storage Owner","コンテナー","Azure Container Storage をインストールし、ストレージ リソースへのアクセスを許可し、Azure Elastic SAN を構成する。","azure-container-storage-owner"],
+  ["Container Apps Contributor","Container Apps 共同作成者","コンテナー","Container Apps の作成・削除・更新を含むフル管理。","container-apps-contributor"],
+  ["Container Apps Operator","コンテナアプリオペレーター","コンテナー","Container Apps の読み取り、ログ ストリーム、および実行。","container-apps-operator"],
+  ["Container Apps Jobs Contributor","Container Apps ジョブの共同作成者","コンテナー","Container Apps ジョブの作成・削除・更新を含むフル管理。","container-apps-jobs-contributor"],
+  ["Container Apps Jobs Operator","Container Apps ジョブ オペレーター","コンテナー","Container Apps ジョブの読み取り、開始、停止。","container-apps-jobs-operator"],
+  ["Container Registry Repository Contributor","コンテナレジストリリポジトリ寄稿者","コンテナー","Azure Container Registry リポジトリへの読み取り、書き込み、削除アクセス。","container-registry-repository-contributor"],
+  ["Container Registry Repository Reader","コンテナレジストリリポジトリリーダー","コンテナー","Azure Container Registry リポジトリへの読み取りアクセス。","container-registry-repository-reader"],
+  ["Container Registry Repository Writer","Container Registry リポジトリのライター","コンテナー","Azure Container Registry リポジトリへの読み取りと書き込みアクセス。","container-registry-repository-writer"],
+  ["Service Fabric Cluster Contributor","Service Fabric クラスター共同作成者","コンテナー","Service Fabric クラスター リソースを管理する。","service-fabric-cluster-contributor"],
+  ["Service Fabric Managed Cluster Contributor","Service Fabric マネージド クラスターの共同作成者","コンテナー","Service Fabric マネージド クラスター リソースをデプロイ・管理する。","service-fabric-managed-cluster-contributor"],
+  ["Kubernetes Cluster - Azure Arc Onboarding","Kubernetes クラスター - Azure Arc オンボード","コンテナー","connectedClusters リソースを作成するためにユーザー/サービスを承認するためのロール定義。","kubernetes-cluster---azure-arc-onboarding"],
+  ["Kubernetes Extension Contributor","Kubernetes 拡張機能共同作成者","コンテナー","Kubernetes 拡張機能を作成・更新・取得・一覧表示・削除できる。","kubernetes-extension-contributor"],
+  ["Defender Kubernetes API Access","Defender Kubernetes API Access","コンテナー","Microsoft Defender for Cloud に Azure Kubernetes Services へのアクセスを許可する。","defender-kubernetes-api-access"],
+  // データベース
+  ["SQL DB Contributor","SQL DB 共同作成者","データベース","SQL データベースを管理できる。セキュリティ ポリシーの管理は不可。","sql-db-contributor"],
+  ["SQL Managed Instance Contributor","SQL Managed Instance Contributor","データベース","SQL マネージド インスタンスと必要なネットワーク構成を管理できる。","sql-managed-instance-contributor"],
+  ["SQL Security Manager","SQL セキュリティ マネージャー","データベース","SQL サーバーとデータベースのセキュリティ関連ポリシーを管理できる。","sql-security-manager"],
+  ["SQL Server Contributor","SQL Server 共同作成者","データベース","SQL サーバーとデータベースを管理できる。セキュリティ ポリシーへのアクセスは不可。","sql-server-contributor"],
+  ["Cosmos DB Account Reader Role","Cosmos DB アカウントの閲覧者ロール","データベース","Azure Cosmos DB アカウントのデータを読み取ることができる。","cosmos-db-account-reader-role"],
+  ["Cosmos DB Operator","Cosmos DB オペレーター","データベース","Azure Cosmos DB アカウントを管理できる。アカウント内のデータへのアクセスは不可。","cosmos-db-operator"],
+  ["CosmosBackupOperator","CosmosBackupOperator (コスモスバックアップオペレーター)","データベース","Cosmos DB データベースまたはコンテナーの復元要求を送信できる。","cosmosbackupoperator"],
+  ["CosmosRestoreOperator","CosmosRestoreOperator","データベース","継続的バックアップ モードの Cosmos DB データベース アカウントの復元アクションを実行できる。","cosmosrestoreoperator"],
+  ["DocumentDB Account Contributor","DocumentDB アカウント共同作成者","データベース","Azure Cosmos DB アカウントを管理できる。","documentdb-account-contributor"],
+  ["Redis Cache Contributor","Redis Cache 共同作成者","データベース","Azure Cache for Redis リソースを作成・管理できる。","redis-cache-contributor"],
+  ["Azure Managed Redis Contributor","Azure Managed Redis Contributor","データベース","Azure Managed Redis リソースを作成・管理できる。","azure-managed-redis-contributor"],
+  ["PostgreSQL Flexible Server Long Term Retention Backup Role","PostgreSQL フレキシブル サーバーの長期保持バックアップ ロール","データベース","長期保持バックアップのために PostgreSQL フレキシブル サーバー リソース API へのアクセスをバックアップ コンテナーに許可するロール。","postgresql-flexible-server-long-term-retention-backup-role"],
+  ["Semantic Reranker User","セマンティック リランカー ユーザー","データベース","登録された推論アカウントに対してセマンティック再ランク付け操作を実行する。","semantic-reranker-user"],
+  ["Azure Connected SQL Server Onboarding","Azure Connected SQL Server Onboarding","データベース","Arc 対応サーバー上の SQL Server の Azure リソースへの読み取り・書き込みアクセスを許可する。","azure-connected-sql-server-onboarding"],
+  // 分析
+  ["Azure Event Hubs Data Owner","Azure Event Hubs データ所有者","分析","Azure Event Hubs リソースへのフル アクセスを許可する。","azure-event-hubs-data-owner"],
+  ["Azure Event Hubs Data Receiver","Azure Event Hubs データ受信者","分析","Azure Event Hubs リソースへの受信アクセスを許可する。","azure-event-hubs-data-receiver"],
+  ["Azure Event Hubs Data Sender","Azure Event Hubs データ送信者","分析","Azure Event Hubs リソースへの送信アクセスを許可する。","azure-event-hubs-data-sender"],
+  ["Data Factory Contributor","Data Factory 共同作成者","分析","データ ファクトリーとその中の子リソースを作成・管理できる。","data-factory-contributor"],
+  ["HDInsight Cluster Operator","HDInsight クラスター オペレーター","分析","HDInsight クラスター構成を読み取り・変更できる。","hdinsight-cluster-operator"],
+  ["HDInsight Domain Services Contributor","HDInsight ドメイン サービスの共同作成者","分析","HDInsight Enterprise Security Package に必要なドメイン サービス関連の操作を読み取り・作成・変更・削除できる。","hdinsight-domain-services-contributor"],
+  ["Schema Registry Contributor","スキーマ レジストリ共同作成者","分析","スキーマ レジストリのグループとスキーマを読み取り・書き込み・削除する。","schema-registry-contributor"],
+  ["Schema Registry Reader","スキーマ レジストリ 閲覧者","分析","スキーマ レジストリのグループとスキーマを読み取りと一覧表示する。","schema-registry-reader"],
+  ["Stream Analytics Query Tester","Stream Analytics クエリのテスター","分析","Stream Analytics ジョブを最初に作成しなくてもクエリ テストを実行できる。","stream-analytics-query-tester"],
+  // AI・機械学習
+  ["Azure AI Administrator","Azure AI 管理者","AI・機械学習","Azure AI とその依存関係を操作するためのすべてのコントロール プレーン アクセス許可を持つ組み込みロール。","azure-ai-administrator"],
+  ["Azure AI Developer","Azure AI Developer","AI・機械学習","ワークスペース自体の管理を除く、Azure Machine Learning ワークスペース内のすべてのアクションを実行できる。","azure-ai-developer"],
+  ["Azure AI Inference Deployment Operator","Azure AI 推論デプロイ オペレーター","AI・機械学習","リソース グループ内にリソース デプロイを作成するために必要なすべてのアクションを実行できる。","azure-ai-inference-deployment-operator"],
+  ["AzureML Compute Operator","AzureML コンピューティング オペレーター","AI・機械学習","Machine Learning Services マネージド コンピューティング リソースへのアクセスと CRUD 操作を実行できる。","azureml-compute-operator"],
+  ["AzureML Data Scientist","AzureML データ科学者","AI・機械学習","コンピューティング リソースの作成/削除とワークスペース自体の変更を除く、Azure Machine Learning ワークスペース内のすべてのアクションを実行できる。","azureml-data-scientist"],
+  ["AzureML Registry User","AzureML レジストリ ユーザー","AI・機械学習","Machine Learning Services レジストリ アセットに対するすべてのアクションとレジストリ リソースの取得を実行できる。","azureml-registry-user"],
+  ["Cognitive Services Contributor","Cognitive Services 共同作成者","AI・機械学習","Cognitive Services のキーを作成・読み取り・更新・削除・管理できる。","cognitive-services-contributor"],
+  ["Cognitive Services OpenAI Contributor","Cognitive Services OpenAI 共同作成者","AI・機械学習","ファインチューニング、デプロイ、テキスト生成の機能を含むフル アクセス。","cognitive-services-openai-contributor"],
+  ["Cognitive Services OpenAI User","Cognitive Services OpenAI ユーザー","AI・機械学習","ファイル、モデル、デプロイを表示するための読み取りアクセス。","cognitive-services-openai-user"],
+  ["Cognitive Services User","Cognitive Services ユーザー","AI・機械学習","Cognitive Services のキーを読み取り、一覧表示できる。","cognitive-services-user"],
+  ["Cognitive Services Custom Vision Contributor","Cognitive Services Custom Vision 共同作成者","AI・機械学習","プロジェクトの表示・作成・編集・削除など、フル アクセス。","cognitive-services-custom-vision-contributor"],
+  ["Cognitive Services Custom Vision Deployment","Cognitive Services Custom Vision デプロイ","AI・機械学習","モデルの発行、取り消し、またはエクスポート。プロジェクトの表示は可能。トレーニングは不可。","cognitive-services-custom-vision-deployment"],
+  ["Cognitive Services Custom Vision Labeler","Cognitive Services カスタムビジョンラベラー","AI・機械学習","トレーニング イメージを表示し、画像タグを作成・編集・削除する。","cognitive-services-custom-vision-labeler"],
+  ["Cognitive Services Custom Vision Reader","Cognitive Services Custom Vision 閲覧者","AI・機械学習","読み取り専用アクション。プロジェクトを表示またはエクスポートできる。","cognitive-services-custom-vision-reader"],
+  ["Cognitive Services Custom Vision Trainer","コグニティブ サービス カスタム ビジョン トレーナー","AI・機械学習","プロジェクトを表示し、トレーニング イメージを作成・編集・削除する。モデルをトレーニングする。","cognitive-services-custom-vision-trainer"],
+  ["Cognitive Services Language Owner","Cognitive Services の言語所有者","AI・機械学習","Language Portal のすべての読み取り・テスト・書き込み・デプロイ・削除機能へのアクセス。","cognitive-services-language-owner"],
+  ["Cognitive Services Language Reader","Cognitive Services の言語閲覧者","AI・機械学習","Language Portal の読み取りとテスト機能へのアクセス。","cognitive-services-language-reader"],
+  ["Cognitive Services Language Writer","Cognitive Services の言語ライター","AI・機械学習","Language Portal のすべての読み取り・テスト・書き込み機能へのアクセス。","cognitive-services-language-writer"],
+  ["Cognitive Services LUIS Owner","Cognitive Services LUIS 所有者","AI・機械学習","LUIS のすべての読み取り・テスト・書き込み・デプロイ・削除機能へのアクセス。","cognitive-services-luis-owner"],
+  ["Cognitive Services LUIS Reader","Cognitive Services LUIS 閲覧者","AI・機械学習","LUIS の読み取りとテスト機能へのアクセス。","cognitive-services-luis-reader"],
+  ["Cognitive Services LUIS Writer","Cognitive Services LUIS ライター","AI・機械学習","LUIS のすべての読み取り・テスト・書き込み機能へのアクセス。","cognitive-services-luis-writer"],
+  ["Cognitive Services Speech Contributor","Cognitive Services スピーチ共同作成者","AI・機械学習","すべてのエンティティの読み取り・書き込み・削除を含む Speech プロジェクトへのフル アクセス。","cognitive-services-speech-contributor"],
+  ["Cognitive Services Speech User","Cognitive Services Speech ユーザー","AI・機械学習","リアルタイム音声認識・バッチ文字起こし・リアルタイム音声合成・長い音声 API へのアクセス。","cognitive-services-speech-user"],
+  ["Search Index Data Contributor","検索インデックス データ共同作成者","AI・機械学習","Azure Cognitive Search インデックス データへのフル アクセスを許可する。","search-index-data-contributor"],
+  ["Search Index Data Reader","検索インデックス データ閲覧者","AI・機械学習","Azure Cognitive Search インデックス データへの読み取りアクセスを許可する。","search-index-data-reader"],
+  ["Search Service Contributor","Search Service 共同作成者","AI・機械学習","Search サービスを管理できる。アクセスは不可。","search-service-contributor"],
+  ["Foundry Account Owner","Foundry アカウント所有者","AI・機械学習","AI プロジェクトとアカウントを管理するためのフル アクセスを許可する。","foundry-account-owner"],
+  ["Foundry Owner","Foundry Owner","AI・機械学習","AI プロジェクトとアカウントを管理するためのフル アクセス。","foundry-owner"],
+  ["Foundry Project Manager","Foundry Project Manager","AI・機械学習","Foundry プロジェクトでの開発者アクションと管理アクションを実行できる。","foundry-project-manager"],
+  ["Foundry User","Foundry ユーザー","AI・機械学習","Foundry プロジェクトへの閲覧者アクセスと Foundry プロジェクトのデータ アクション。","foundry-user"],
+  ["Healthcare Agent Admin","医療エージェント管理者","AI・機械学習","すべてのボット リソース、シナリオ、構成設定を表示・編集できる。","healthcare-agent-admin"],
+  ["Healthcare Agent Editor","ヘルスケアエージェント編集者","AI・機械学習","すべてのボット リソース、シナリオ、構成設定を表示・編集できる。","healthcare-agent-editor"],
+  ["Healthcare Agent Reader","ヘルスケアエージェントリーダー","AI・機械学習","ボット リソース、シナリオ、構成設定への読み取り専用アクセス。","healthcare-agent-reader"],
+  // IoT
+  ["Azure Digital Twins Data Owner","Azure Digital Twins データ所有者","IoT","Digital Twins データ プレーンへのフル アクセス ロール。","azure-digital-twins-data-owner"],
+  ["Azure Digital Twins Data Reader","Azure Digital Twins データ リーダー","IoT","Digital Twins データ プレーン プロパティへの読み取り専用ロール。","azure-digital-twins-data-reader"],
+  ["Azure IoT Operations Administrator","Azure IoT Operations Administrator","IoT","AIO リソースを表示・作成・編集・削除する。","azure-iot-operations-administrator"],
+  ["Azure IoT Operations Onboarding","Azure IoT Operations Onboarding","IoT","Azure IoT Operations を安全に Arc 接続およびデプロイできる。","azure-iot-operations-onboarding"],
+  ["Device Provisioning Service Data Contributor","デバイス プロビジョニング サービスのデータ共同作成者","IoT","Device Provisioning Service データ プレーン操作へのフル アクセスを許可する。","device-provisioning-service-data-contributor"],
+  ["Device Provisioning Service Data Reader","デバイス プロビジョニング サービスのデータ閲覧者","IoT","Device Provisioning Service データ プレーン プロパティへのフル読み取りアクセスを許可する。","device-provisioning-service-data-reader"],
+  ["Device Update Administrator","デバイス更新管理者","IoT","管理とコンテンツ操作へのフル アクセスを提供する。","device-update-administrator"],
+  ["Device Update Content Administrator","デバイス更新のコンテンツ管理者","IoT","コンテンツ操作へのフル アクセスを提供する。","device-update-content-administrator"],
+  ["Device Update Content Reader","デバイス更新のコンテンツ閲覧者","IoT","コンテンツ操作への読み取りアクセスを提供するが、変更は不可。","device-update-content-reader"],
+  ["Device Update Deployments Administrator","デバイス更新デプロイ管理者","IoT","管理操作へのフル アクセスを提供する。","device-update-deployments-administrator"],
+  ["Device Update Deployments Reader","デバイス更新デプロイの閲覧者","IoT","管理操作への読み取りアクセスを提供するが、変更は不可。","device-update-deployments-reader"],
+  ["Device Update Reader","デバイス更新閲覧者","IoT","管理とコンテンツ操作への読み取りアクセスを提供するが、変更は不可。","device-update-reader"],
+  ["IoT Hub Data Contributor","IoT Hub データ共同作成者","IoT","IoT Hub データ プレーン操作へのフル アクセスを許可する。","iot-hub-data-contributor"],
+  ["IoT Hub Data Reader","IoT Hub データ リーダー","IoT","IoT Hub データ プレーン プロパティへのフル読み取りアクセスを許可する。","iot-hub-data-reader"],
+  ["IoT Hub Registry Contributor","IoT Hub レジストリ共同作成者","IoT","IoT Hub デバイス レジストリへのフル アクセスを許可する。","iot-hub-registry-contributor"],
+  ["IoT Hub Twin Contributor","IoT Hub ツイン共同作成者","IoT","すべての IoT Hub デバイスおよびモジュール ツインへの読み取り・書き込みアクセスを許可する。","iot-hub-twin-contributor"],
+  ["Azure Device Registry Contributor","Azure デバイス レジストリ共同作成者","IoT","Azure Device Registry 名前空間内の IoT デバイスへのフル アクセスを許可する。","azure-device-registry-contributor"],
+  ["Firmware Analysis Admin","ファームウェア分析管理者","IoT","ファームウェアのアップロード・表示とワークスペースの構成を行う管理ユーザー。","firmware-analysis-admin"],
+  ["Firmware Analysis Reader","ファームウェア分析リーダー","IoT","ファームウェア イメージを表示できるが、アップロードやワークスペースの構成変更は不可。","firmware-analysis-reader"],
+  ["Firmware Analysis User","ファームウェア分析ユーザー","IoT","ファームウェア イメージをアップロード・分析できるが、ワークスペースの構成変更は不可。","firmware-analysis-user"],
+  // 統合
+  ["API Management Service Contributor","API Management サービス共同作成者","統合","サービスと API を管理できる。","api-management-service-contributor"],
+  ["API Management Service Operator Role","API Management サービス運用者 役割","統合","サービスを管理できるが、API は管理不可。","api-management-service-operator-role"],
+  ["API Management Service Reader Role","API Management サービス閲覧者ロール","統合","サービスと API への読み取り専用アクセス。","api-management-service-reader-role"],
+  ["API Management Developer Portal Content Editor","API Management 開発者ポータル コンテンツ エディター","統合","開発者ポータルをカスタマイズし、コンテンツを編集して発行できる。","api-management-developer-portal-content-editor"],
+  ["API Management Workspace Contributor","API Management のワークスペース共同作成者","統合","ワークスペースを管理し、メンバーを表示できる (変更不可)。","api-management-workspace-contributor"],
+  ["API Management Workspace Reader","API Management のワークスペース閲覧者","統合","ワークスペース内のエンティティへの読み取り専用アクセス。","api-management-workspace-reader"],
+  ["App Configuration Contributor","App Configuration の共同作成者","統合","消去を除くすべての管理操作の権限を App Configuration リソースに付与する。","app-configuration-contributor"],
+  ["App Configuration Data Owner","App Configuration データ所有者","統合","App Configuration データへのフル アクセスを許可する。","app-configuration-data-owner"],
+  ["App Configuration Data Reader","App Configuration のデータ閲覧者","統合","App Configuration データへの読み取りアクセスを許可する。","app-configuration-data-reader"],
+  ["App Configuration Reader","App Configuration の閲覧者","統合","App Configuration リソースへの読み取り操作のアクセス許可を付与する。","app-configuration-reader"],
+  ["Azure Service Bus Data Owner","Azure Service Bus データ所有者","統合","Azure Service Bus リソースへのフル アクセスを許可する。","azure-service-bus-data-owner"],
+  ["Azure Service Bus Data Receiver","Azure Service Bus データ受信者","統合","Azure Service Bus リソースへの受信アクセスを許可する。","azure-service-bus-data-receiver"],
+  ["Azure Service Bus Data Sender","Azure Service Bus データ送信者","統合","Azure Service Bus リソースへの送信アクセスを許可する。","azure-service-bus-data-sender"],
+  ["Azure Relay Listener","Azure Relay Listener","統合","Azure Relay リソースへのリッスン アクセスを許可する。","azure-relay-listener"],
+  ["Azure Relay Owner","Azure Relay Owner","統合","Azure Relay リソースへのフル アクセスを許可する。","azure-relay-owner"],
+  ["Azure Relay Sender","Azure Relay Sender","統合","Azure Relay リソースへの送信アクセスを許可する。","azure-relay-sender"],
+  ["EventGrid Contributor","EventGrid 共同作成者","統合","EventGrid の操作を管理できる。","eventgrid-contributor"],
+  ["EventGrid Data Sender","EventGrid のデータ送信者","統合","イベント グリッド イベントへの送信アクセスを許可する。","eventgrid-data-sender"],
+  ["EventGrid EventSubscription Contributor","EventGrid EventSubscription の共同作成者","統合","EventGrid イベント サブスクリプション操作を管理できる。","eventgrid-eventsubscription-contributor"],
+  ["EventGrid EventSubscription Reader","EventGrid EventSubscription の閲覧者","統合","EventGrid イベント サブスクリプションを読み取ることができる。","eventgrid-eventsubscription-reader"],
+  ["Logic App Contributor","ロジック アプリ共同作成者","統合","ロジック アプリを管理できる。アクセスの変更は不可。","logic-app-contributor"],
+  ["Logic App Operator","ロジック アプリのオペレーター","統合","ロジック アプリの読み取り、有効化、無効化ができる。編集・更新は不可。","logic-app-operator"],
+  ["FHIR Data Contributor","FHIR のデータ共同作成者","統合","FHIR データへのフル アクセスをユーザーまたはプリンシパルに許可するロール。","fhir-data-contributor"],
+  ["FHIR Data Converter","FHIR データのコンバーター","統合","レガシ形式から FHIR にデータを変換できる。","fhir-data-converter"],
+  ["FHIR Data Exporter","FHIR データ エクスポーター","統合","FHIR データの読み取りとエクスポートができる。","fhir-data-exporter"],
+  ["FHIR Data Importer","FHIR データ インポーター","統合","FHIR データの読み取りとインポートができる。","fhir-data-importer"],
+  ["FHIR Data Reader","FHIR のデータ閲覧者","統合","FHIR データを読み取ることができる。","fhir-data-reader"],
+  ["FHIR Data Writer","FHIR データ ライター","統合","FHIR データの読み取りと書き込みができる。","fhir-data-writer"],
+  ["DICOM Data Owner","DICOM のデータ所有者","統合","DICOM データへのフル アクセス。","dicom-data-owner"],
+  ["DICOM Data Reader","DICOM のデータ閲覧者","統合","DICOM データの読み取りと検索。","dicom-data-reader"],
+  ["Integration Service Environment Contributor","統合サービス環境の共同作成者","統合","統合サービス環境を管理できる。アクセスは不可。","integration-service-environment-contributor"],
+  ["Integration Service Environment Developer","統合サービス環境の開発者","統合","統合サービス環境でワークフロー、統合アカウント、API 接続を作成・更新できる。","integration-service-environment-developer"],
+  ["BizTalk Contributor","BizTalk 共同作成者","統合","BizTalk サービスを管理できる。アクセスは不可。","biztalk-contributor"],
+  ["Durable Task Data Contributor","永続タスクのデータ共同作成者","統合","Durable Task のすべてのデータ アクセス操作のためのロール。","durable-task-data-contributor"],
+  ["Durable Task Data Reader","耐久タスクデータリーダー","統合","すべての Durable Task Scheduler データを読み取る。","durable-task-data-reader"],
+  ["Durable Task Worker","耐久性タスク作業者","統合","Durable Task サービスと対話するためにワーカー アプリケーションによって使用される。","durable-task-worker"],
+  // ID管理
+  ["Managed Identity Contributor","マネージド ID 共同作成者","ID管理","ユーザー割り当て ID を作成・読み取り・更新・削除する。","managed-identity-contributor"],
+  ["Managed Identity Operator","マネージド ID オペレーター","ID管理","ユーザー割り当て ID を読み取り・割り当てる。","managed-identity-operator"],
+  ["Domain Services Contributor","ドメイン サービス共同作成者","ID管理","Azure AD Domain Services と関連するネットワーク構成を管理できる。","domain-services-contributor"],
+  ["Domain Services Reader","ドメイン サービスの閲覧者","ID管理","Azure AD Domain Services と関連するネットワーク構成を表示できる。","domain-services-reader"],
+  // セキュリティ
+  ["Key Vault Administrator","Key Vault 管理者","セキュリティ","Key Vault のすべてのデータ プレーン操作 (証明書、キー、シークレットを含む) を実行する。","key-vault-administrator"],
+  ["Key Vault Certificate User","Key Vault Certificate User","セキュリティ","証明書の内容を読み取る。Azure RBAC アクセス許可モデルを使用する Key Vault でのみ機能する。","key-vault-certificate-user"],
+  ["Key Vault Certificates Officer","キー・ボールト証明書管理者","セキュリティ","アクセス許可の管理を除く、Key Vault の証明書に対するすべての操作を実行する。","key-vault-certificates-officer"],
+  ["Key Vault Contributor","Key Vault 共同作成者","セキュリティ","Key Vault を管理する。Azure RBAC でのロール割り当てと、シークレット・キー・証明書へのアクセスは不可。","key-vault-contributor"],
+  ["Key Vault Crypto Officer","Key Vault Crypto Officer","セキュリティ","アクセス許可の管理を除く、Key Vault のキーに対するすべての操作を実行する。","key-vault-crypto-officer"],
+  ["Key Vault Crypto Service Encryption User","キー・ボールト・クリプト・サービス暗号化利用者","セキュリティ","キーのメタデータを読み取り、ラップ/ラップ解除操作を実行する。","key-vault-crypto-service-encryption-user"],
+  ["Key Vault Crypto User","Key Vault Crypto User","セキュリティ","キーを使用して暗号化操作を実行する。","key-vault-crypto-user"],
+  ["Key Vault Data Access Administrator","Key Vault データ アクセス管理者","セキュリティ","Key Vault のデータ アクセスを管理する。","key-vault-data-access-administrator"],
+  ["Key Vault Reader","Key Vault 閲覧者","セキュリティ","Key Vault とその証明書、キー、シークレットのメタデータを読み取る。シークレット値やキー マテリアルの読み取りは不可。","key-vault-reader"],
+  ["Key Vault Secrets Officer","キー・ボールト・シークレット・オフィサー","セキュリティ","アクセス許可の管理を除く、Key Vault のシークレットに対するすべての操作を実行する。","key-vault-secrets-officer"],
+  ["Key Vault Secrets User","Key Vault シークレット ユーザー","セキュリティ","シークレットの内容を読み取る。","key-vault-secrets-user"],
+  ["Managed HSM Contributor","マネージド HSM 共同作成者","セキュリティ","マネージド HSM プールを管理できる。","managed-hsm-contributor"],
+  ["Security Admin","セキュリティ管理者","セキュリティ","Microsoft Defender for Cloud のアクセス許可を表示・更新する。","security-admin"],
+  ["Security Assessment Contributor","セキュリティ評価共同作成者","セキュリティ","Microsoft Defender for Cloud への評価のプッシュを許可する。","security-assessment-contributor"],
+  ["Security Manager (Legacy)","セキュリティ マネージャー (レガシ)","セキュリティ","セキュリティ コンポーネント、セキュリティ ポリシー、VM を管理する。","security-manager-legacy"],
+  ["Security Reader","セキュリティ閲覧者","セキュリティ","Microsoft Defender for Cloud のアクセス許可を表示する。推奨事項、アラート、ポリシー、セキュリティの状態を表示できる。","security-reader"],
+  ["Attestation Contributor","構成証明共同作成者","セキュリティ","構成証明プロバイダーのインスタンスを読み取り・書き込み・削除できる。","attestation-contributor"],
+  ["Attestation Reader","認証リーダー","セキュリティ","構成証明プロバイダーのプロパティを読み取ることができる。","attestation-reader"],
+  ["Microsoft Sentinel Contributor","Microsoft Sentinel共同作成者","セキュリティ","Microsoft Sentinel を管理できる。他のユーザーへのアクセス付与は不可。","microsoft-sentinel-contributor"],
+  ["Microsoft Sentinel Reader","Microsoft Sentinel リーダー","セキュリティ","ブック、分析ルール、ハンティング クエリなどの Microsoft Sentinel リソースを表示できる。変更は不可。","microsoft-sentinel-reader"],
+  ["Microsoft Sentinel Responder","Microsoft Sentinel レスポンダー","セキュリティ","Microsoft Sentinel でのインシデントを管理できる。","microsoft-sentinel-responder"],
+  ["Microsoft Sentinel Playbook Operator","Microsoft Sentinel プレイブック オペレーター","セキュリティ","Microsoft Sentinel でプレイブックをトリガーできる。","microsoft-sentinel-playbook-operator"],
+  ["Microsoft Sentinel Automation Contributor","Microsoft Sentinel Automation 共同作成者","セキュリティ","Microsoft Sentinel がオートメーション ルールを作成・更新できるようにする。","microsoft-sentinel-automation-contributor"],
+  ["App Compliance Automation Administrator","アプリ コンプライアンス オートメーションの管理者","セキュリティ","Microsoft 365 向けアプリ コンプライアンス オートメーション ツールの管理を許可する。","app-compliance-automation-administrator"],
+  ["App Compliance Automation Reader","アプリ コンプライアンス オートメーションの閲覧者","セキュリティ","Microsoft 365 向けアプリ コンプライアンス オートメーション ツールへの読み取り専用アクセスを許可する。","app-compliance-automation-reader"],
+  // 監視
+  ["Monitoring Contributor","監視共同作成者","監視","すべての監視データを読み取り、監視設定を編集できる。","monitoring-contributor"],
+  ["Monitoring Metrics Publisher","監視メトリックのパブリッシャー","監視","Azure リソースに対してメトリックの発行を有効にする。","monitoring-metrics-publisher"],
+  ["Monitoring Reader","監視リーダー","監視","すべての監視データ (メトリック、ログなど) と監視設定を読み取ることができる。","monitoring-reader"],
+  ["Log Analytics Contributor","Log Analytics 共同作成者","監視","すべての監視データを読み取り、監視設定を編集できる。VM への Log Analytics エージェントのインストールを含む。","log-analytics-contributor"],
+  ["Log Analytics Reader","Log Analytics 閲覧者","監視","すべての監視データを表示・検索し、監視設定を表示できる。","log-analytics-reader"],
+  ["Workbook Contributor","ワークブックの共同作成者","監視","共有ブックを保存できる。","workbook-contributor"],
+  ["Workbook Reader","ワークブックリーダー","監視","ブックを読み取ることができる。","workbook-reader"],
+  ["Application Insights Component Contributor","Application Insights コンポーネント共同作成者","監視","Application Insights コンポーネントを管理できる。","application-insights-component-contributor"],
+  ["Grafana Admin","Grafana 管理者","監視","Grafana インスタンスへの管理者アクセス。","grafana-admin"],
+  ["Grafana Editor","Grafana エディター","監視","Grafana インスタンスへのエディター アクセス。","grafana-editor"],
+  ["Grafana Viewer","Grafana ビューアー","監視","Grafana インスタンスへの閲覧者アクセス。","grafana-viewer"],
+  ["Data Purger","データ消去","監視","分析データを消去できる。","data-purger"],
+  // DevOps
+  ["DevTest Labs User","DevTest Labs ユーザー","DevOps","DevTest Labs の仮想マシンの接続・起動・再起動・シャットダウンができる。","devtest-labs-user"],
+  ["Lab Creator","ラボ作成者","DevOps","Azure Lab Services でマネージド ラボを作成できる。","lab-creator"],
+  ["Lab Contributor","ラボ共同作成者","DevOps","Azure Lab Services でラボを完全に制御できる。","lab-contributor"],
+  ["Lab Assistant","ラボ アシスタント","DevOps","ラボを表示し、ラボ VM の接続・起動・再起動・シャットダウンができる。","lab-assistant"],
+  ["Lab Operator","ラボ オペレーター","DevOps","ラボを完全に制御できるが、再作成は不可。","lab-operator"],
+  ["Chaos Studio Experiment Contributor","Chaos Studio 実験共同作成者","DevOps","Chaos Studio 実験を作成・管理できる。","chaos-studio-experiment-contributor"],
+  ["Chaos Studio Operator","Chaos Studio 演算子","DevOps","Chaos Studio 実験を開始・キャンセルできる。","chaos-studio-operator"],
+  ["Load Test Owner","負荷テストの所有者","DevOps","ロード テスト リソースのすべての操作を実行できる。","load-test-owner"],
+  ["Load Test Contributor","負荷テストの共同作成者","DevOps","ロード テスト リソースの作成・更新を実行できる。","load-test-contributor"],
+  ["Load Test Reader","負荷テストの閲覧者","DevOps","すべてのロード テスト リソースを表示できるが、変更は不可。","load-test-reader"],
+  ["DevCenter Dev Box User","DevCenter 開発ボックスユーザー","DevOps","Dev Box を作成および管理できる。","devcenter-dev-box-user"],
+  ["DevCenter Project Admin","DevCenter のプロジェクト管理者","DevOps","DevCenter プロジェクトのすべての側面を管理できる。","devcenter-project-admin"],
+  ["Deployment Environments User","Deployment Environments ユーザー","DevOps","Deployment Environments サービスでデプロイ環境を作成・管理できる。","deployment-environments-user"],
+  ["Playwright Workspace Contributor","Playwright ワークスペース共同作成者","DevOps","Playwright ワークスペースで実行を管理できる。","playwright-workspace-contributor"],
+  ["Playwright Workspace Owner","Playwright ワークスペース所有者","DevOps","Playwright ワークスペースへのフル アクセス。","playwright-workspace-owner"],
+  ["Playwright Workspace Reader","Playwright ワークスペース 閲覧者","DevOps","Playwright ワークスペースの読み取り専用アクセス。","playwright-workspace-reader"],
+  // 管理・ガバナンス
+  ["Automation Contributor","Automation 共同作成者","管理・ガバナンス","Automation アカウントとそのリソースを管理する。","automation-contributor"],
+  ["Automation Job Operator","オートメーション業務作業員","管理・ガバナンス","Automation Runbook を使用してジョブを作成・管理する。","automation-job-operator"],
+  ["Automation Operator","オートメーション操員","管理・ガバナンス","Automation オペレーターはジョブを開始・停止・中断・再開できる。","automation-operator"],
+  ["Automation Runbook Operator","オートメーション ランブック オペレーター","管理・ガバナンス","Runbook のプロパティを読み取り、Runbook のジョブを作成できる。","automation-runbook-operator"],
+  ["Billing Reader","請求書リーダー","管理・ガバナンス","課金データへの読み取りアクセスを許可する。","billing-reader"],
+  ["Blueprint Contributor","ブループリント共同作成者","管理・ガバナンス","ブループリント定義を管理できる。割り当てることは不可。","blueprint-contributor"],
+  ["Blueprint Operator","ブループリント オペレーター","管理・ガバナンス","既存の公開済みブループリントを割り当てられる。ブループリントの作成は不可。","blueprint-operator"],
+  ["Cost Management Contributor","Cost Management の共同作成者","管理・ガバナンス","コストを表示し、コスト構成 (予算、エクスポートなど) を管理できる。","cost-management-contributor"],
+  ["Cost Management Reader","Cost Management の閲覧者","管理・ガバナンス","コスト データと構成を表示できる。","cost-management-reader"],
+  ["Management Group Contributor","管理グループの共同作成者","管理・ガバナンス","管理グループの役割を管理する。","management-group-contributor"],
+  ["Management Group Reader","管理グループの閲覧者","管理・ガバナンス","管理グループを表示できる。","management-group-reader"],
+  ["Resource Policy Contributor","リソース ポリシーの共同作成者","管理・ガバナンス","リソース ポリシーの作成/変更、サポート チケットの作成、リソース/階層の読み取り権限。","resource-policy-contributor"],
+  ["Tag Contributor","タグ共同作成者","管理・ガバナンス","リソースとリソース グループのタグを管理できる。リソース自体へのアクセスは不可。","tag-contributor"],
+  ["Azure Connected Machine Onboarding","Azure Connected Machine Onboarding","管理・ガバナンス","Azure Arc 対応サーバーをオンボードできる。","azure-connected-machine-onboarding"],
+  ["Azure Connected Machine Resource Administrator","Azure Connected Machine Resource Administrator","管理・ガバナンス","Azure Arc 接続マシンを読み取り・書き込み・削除・再オンボードできる。","azure-connected-machine-resource-administrator"],
+  ["Hierarchy Settings Administrator","階層設定管理者","管理・ガバナンス","管理グループ階層の設定を編集・削除できる。","hierarchy-settings-administrator"],
+  ["Managed Services Registration Assignment Delete Role","マネージド サービスの登録割り当て削除ロール","管理・ガバナンス","マネージド サービスの登録割り当てを削除できる。","managed-services-registration-assignment-delete-role"],
+  ["Quota Request Operator","クォータ要求オペレーター","管理・ガバナンス","クォータ要求を読み取り・作成し、承認を得る。","quota-request-operator"],
+  ["Carbon Optimization Reader","Carbon Optimization の閲覧者","管理・ガバナンス","カーボン最適化データへの読み取りアクセスを許可する。","carbon-optimization-reader"],
+  ["Azure Center for SAP Solutions Administrator","Azure Center for SAP ソリューション管理者","管理・ガバナンス","Azure Center for SAP Solutions のインフラストラクチャとソフトウェアのすべての読み取り・書き込みアクセス。","azure-center-for-sap-solutions-administrator"],
+  ["Azure Center for SAP Solutions Reader","Azure Center for SAP ソリューション リーダー","管理・ガバナンス","Azure Center for SAP Solutions への読み取り専用アクセス。","azure-center-for-sap-solutions-reader"],
+  ["Services Hub Operator","Services Hub オペレーター","管理・ガバナンス","Services Hub コネクタに関するすべての読み取り・書き込み・削除操作を実行できる。","services-hub-operator"],
+
+  // コンピューティング (2026-06 追加分)
+  ["Azure Batch Account Contributor","Azure Batch アカウント共同作成者","コンピューティング","Batch アカウント、プール、ジョブなど、すべての Batch リソースを管理するためのフル アクセスを許可する。","azure-batch-account-contributor"],
+  ["Azure Batch Account Reader","Azure Batch アカウント閲覧者","コンピューティング","Batch アカウント内のプールとジョブを含むすべてのリソースを表示できる。","azure-batch-account-reader"],
+  ["Azure Batch Data Contributor","Azure Batch データ共同作成者","コンピューティング","Batch プールとジョブを管理できるが、アカウントは変更できない。","azure-batch-data-contributor"],
+  ["Azure Batch Job Submitter","Azure Batch ジョブの送信者","コンピューティング","Batch アカウントでジョブを送信・管理できる。","azure-batch-job-submitter"],
+  ["Compute Limit Operator","コンピューティング制限演算子","コンピューティング","コンピューティング制限操作を使用して制限を読み取り・管理する。","compute-limit-operator"],
+
+  // ストレージ (2026-06 追加分)
+  ["Storage File Data SMB Take Ownership","ストレージ ファイル データ SMB 所有権の取得","ストレージ","エンド ユーザーがファイルやディレクトリの所有権を継承できるようにする。","storage-file-data-smb-take-ownership"],
+  ["Storage File Data SMB MI Admin","ストレージ ファイル データ SMB MI 管理者","ストレージ","Azure ファイル共有内のファイル・ディレクトリに対し、マネージド ID による管理者レベルのアクセスを許可する。","storage-file-data-smb-mi-admin"],
+  ["Storage Actions Blob Data Operator","ストレージ アクション BLOB データ演算子","ストレージ","ストレージ アクションのストレージ タスクが、ストレージ アカウントの BLOB を一覧表示・操作するために使用する。","storage-actions-blob-data-operator"],
+  ["Storage Actions Contributor","ストレージ アクション共同作成者","ストレージ","ストレージ アクションの作成・読み取り・更新・削除を行える。","storage-actions-contributor"],
+  ["Storage Actions Task Assignment Contributor","ストレージ アクション タスク割り当て共同作成者","ストレージ","対象のストレージ アカウントにストレージ アクションのタスク割り当てを作成できる。","storage-actions-task-assignment-contributor"],
+  ["Storage Connector Contributor","Storage Connector 共同作成者","ストレージ","ストレージ アカウント内のリモート データ ソースへインプレースでアクセスするコネクタを作成・管理する (プレビュー)。","storage-connector-contributor"],
+  ["Storage DataShare Contributor","Storage DataShare 共同作成者","ストレージ","ストレージ アカウントのデータをインプレースで共有する DataShare を作成・管理する (プレビュー)。","storage-datashare-contributor"],
+  ["Backup MUA Admin","バックアップ MUA 管理者","ストレージ","バックアップのマルチユーザー承認 (MUA) で ResourceGuard を作成・削除できる。","backup-mua-admin"],
+  ["Backup MUA Operator","バックアップ MUA オペレーター","ストレージ","バックアップのマルチユーザー承認 (MUA) で、ResourceGuard により保護された重要な操作を実行できる。","backup-mua-operator"],
+  ["Classic Storage Account Key Operator Service Role","従来のストレージ アカウント キー オペレーターのサービス ロール","ストレージ","従来のストレージ アカウントのアクセス キーの一覧表示と再生成を許可する。","classic-storage-account-key-operator-service-role"],
+  ["Azure File Sync Reader","Azure File Sync 閲覧者","ストレージ","Azure File Sync サービス (Storage Sync Service) への読み取りアクセスを提供する。","azure-file-sync-reader"],
+  ["Storage File Delegator","ストレージ ファイルの委任者","ストレージ","Azure AD 資格情報で署名された Azure ファイル共有のユーザー委任 SAS を取得する。","storage-file-delegator"],
+  ["Storage Queue Delegator","ストレージ キューの委任者","ストレージ","Azure AD 資格情報で署名されたストレージ キューのユーザー委任 SAS を取得する。","storage-queue-delegator"],
+  ["Storage Table Delegator","ストレージ テーブルの委任者","ストレージ","Azure AD 資格情報で署名されたストレージ テーブルのユーザー委任 SAS を取得する。","storage-table-delegator"],
+
+  // Web・アプリ (2026-06 追加分)
+  ["Azure Maps Search and Render Data Reader","Azure Maps 検索とレンダリング データ閲覧者","Web・アプリ","一般的なビジュアル Web SDK シナリオに対し、レンダリングと検索のデータ API のみへの限定アクセスを許可する。","azure-maps-search-and-render-data-reader"],
+  ["Azure Spring Apps Application Configuration Service Config File Pattern Reader Role","Azure Spring Apps アプリケーション構成サービス構成ファイル パターン閲覧者ロール","Web・アプリ","Azure Spring Apps の Application Configuration Service の構成ファイル パターンのコンテンツを読み取る。","azure-spring-apps-application-configuration-service-config-file-pattern-reader-role"],
+  ["Azure Spring Apps Application Configuration Service Log Reader Role","Azure Spring Apps アプリケーション構成サービス ログ閲覧者ロール","Web・アプリ","Azure Spring Apps の Application Configuration Service のリアルタイム ログを読み取る。","azure-spring-apps-application-configuration-service-log-reader-role"],
+  ["Azure Spring Apps Connect Role","Azure Spring Apps Connect ロール","Web・アプリ","特定のアプリケーション インスタンスに接続できる。","azure-spring-apps-connect-role"],
+  ["Azure Spring Apps Job Log Reader Role","Azure Spring Apps ジョブ ログ閲覧者ロール","Web・アプリ","Azure Spring Apps でのジョブのリアルタイム ログを読み取る。","azure-spring-apps-job-log-reader-role"],
+  ["Azure Spring Apps Remote Debugging Role","Azure Spring Apps のリモート デバッグ ロール","Web・アプリ","特定のアプリケーション インスタンスのリモート デバッグを行える。","azure-spring-apps-remote-debugging-role"],
+  ["Azure Spring Apps Spring Cloud Gateway Log Reader Role","Azure Spring Apps Spring Cloud Gateway ログ閲覧者ロール","Web・アプリ","Azure Spring Apps で Spring Cloud Gateway のリアルタイム ログを読み取る。","azure-spring-apps-spring-cloud-gateway-log-reader-role"],
+
+  // コンテナー (2026-06 追加分)
+  ["Azure Kubernetes Fleet Manager Contributor Role","Azure Kubernetes Fleet Manager 共同作成者ロール","コンテナー","Azure Kubernetes Fleet Manager が提供するリソース (フリート、フリート メンバーなど) への読み書きアクセスを許可する。","azure-kubernetes-fleet-manager-contributor-role"],
+  ["Azure Kubernetes Fleet Manager Hub Agent Role","Azure Kubernetes Fleet Manager Hub エージェント ロール","コンテナー","Fleet Manager ハブ エージェントに必要な Azure リソースへのアクセスを許可する。","azure-kubernetes-fleet-manager-hub-agent-role"],
+  ["Azure Kubernetes Fleet Manager Hub Cluster User Role","Azure Kubernetes Fleet Manager Hub クラスター ユーザー ロール","コンテナー","Fleet Manager と Kubernetes 構成ファイルへの読み取りアクセスを付与し、フリート マネージド ハブ クラスターに接続できるようにする。","azure-kubernetes-fleet-manager-hub-cluster-user-role"],
+  ["Azure Kubernetes Fleet Manager RBAC Admin","Azure Kubernetes Fleet Manager RBAC 管理者","コンテナー","フリート マネージド ハブ クラスターの名前空間内リソースへの読み書きアクセスを付与する。","azure-kubernetes-fleet-manager-rbac-admin"],
+  ["Azure Kubernetes Fleet Manager RBAC Admin for Member Clusters","メンバー クラスターの Azure Kubernetes Fleet Manager RBAC 管理者","コンテナー","フリート内メンバー クラスターの名前空間内リソースへの管理者アクセスを付与する。","azure-kubernetes-fleet-manager-rbac-admin-for-member-clusters"],
+  ["Azure Kubernetes Fleet Manager RBAC Cluster Admin","Azure Kubernetes Fleet Manager RBAC クラスター管理者","コンテナー","フリート マネージド ハブ クラスター内のすべての Kubernetes リソースへの読み書きアクセスを付与する。","azure-kubernetes-fleet-manager-rbac-cluster-admin"],
+  ["Azure Kubernetes Fleet Manager RBAC Cluster Admin for Member Clusters","メンバー クラスターの Azure Kubernetes Fleet Manager RBAC クラスター管理者","コンテナー","フリート内メンバー クラスターのすべてのリソースを管理できる。","azure-kubernetes-fleet-manager-rbac-cluster-admin-for-member-clusters"],
+  ["Azure Kubernetes Fleet Manager RBAC Reader","Azure Kubernetes Fleet Manager RBAC 閲覧者","コンテナー","フリート マネージド ハブ クラスター内の名前空間リソースへの読み取り専用アクセスを付与する。","azure-kubernetes-fleet-manager-rbac-reader"],
+  ["Azure Kubernetes Fleet Manager RBAC Reader for Member Clusters","メンバー クラスターの Azure Kubernetes Fleet Manager RBAC 閲覧者","コンテナー","フリート内メンバー クラスターの名前空間内オブジェクトへの読み取り専用アクセスを付与する。","azure-kubernetes-fleet-manager-rbac-reader-for-member-clusters"],
+  ["Azure Kubernetes Fleet Manager RBAC Writer","Azure Kubernetes Fleet Manager RBAC ライター","コンテナー","フリート マネージド ハブ クラスターの名前空間内リソースへの読み書きアクセスを付与する。","azure-kubernetes-fleet-manager-rbac-writer"],
+  ["Azure Kubernetes Fleet Manager RBAC Writer for Member Clusters","メンバー クラスターの Azure Kubernetes Fleet Manager RBAC ライター","コンテナー","フリート内メンバー クラスターの名前空間内オブジェクトへの読み書きアクセスを付与する。","azure-kubernetes-fleet-manager-rbac-writer-for-member-clusters"],
+  ["Azure Kubernetes Service Arc Cluster Admin Role","Azure Kubernetes Service Arc クラスター管理者ロール","コンテナー","クラスター管理者の資格情報アクションを一覧表示する。","azure-kubernetes-service-arc-cluster-admin-role"],
+  ["Azure Kubernetes Service Arc Cluster User Role","Azure Kubernetes Service Arc クラスター ユーザー ロール","コンテナー","クラスター ユーザーの資格情報アクションを一覧表示する。","azure-kubernetes-service-arc-cluster-user-role"],
+  ["Azure Kubernetes Service Arc Contributor Role","Azure Kubernetes Service Arc 共同作成者ロール","コンテナー","Azure Kubernetes Service ハイブリッド クラスターへの読み書きアクセスを許可する。","azure-kubernetes-service-arc-contributor-role"],
+  ["Azure Kubernetes Service Namespace Contributor","Azure Kubernetes Service 名前空間共同作成者","コンテナー","AKS の名前空間リソースを作成・管理できる。","azure-kubernetes-service-namespace-contributor"],
+  ["Azure Kubernetes Service Namespace User","Azure Kubernetes Service 名前空間ユーザー","コンテナー","AKS の名前空間リソースを読み取れる。","azure-kubernetes-service-namespace-user"],
+  ["Azure Red Hat OpenShift Cloud Controller Manager","Azure Red Hat OpenShift クラウド コントローラー マネージャー","コンテナー","OpenShift 上のクラウド コントローラー マネージャーを管理・更新する。","azure-red-hat-openshift-cloud-controller-manager"],
+  ["Azure Red Hat OpenShift Cluster Ingress Operator","Azure Red Hat OpenShift クラスター イングレス オペレーター","コンテナー","OpenShift ルーターを管理・構成する。","azure-red-hat-openshift-cluster-ingress-operator"],
+  ["Azure Red Hat OpenShift Disk Storage Operator","Azure Red Hat OpenShift Disk Storage オペレーター","コンテナー","クラスターで Azure ディスクを使用可能にする CSI ドライバーをインストールする。","azure-red-hat-openshift-disk-storage-operator"],
+  ["Azure Red Hat OpenShift Federated Credential","Azure Red Hat OpenShift フェデレーション資格情報","コンテナー","ユーザー割り当てマネージド ID のフェデレーション資格情報を作成・更新・削除する。","azure-red-hat-openshift-federated-credential"],
+  ["Azure Red Hat OpenShift File Storage Operator","Azure Red Hat OpenShift File Storage オペレーター","コンテナー","クラスターで Azure Files を使用可能にする CSI ドライバーをインストールする。","azure-red-hat-openshift-file-storage-operator"],
+  ["Azure Red Hat OpenShift Image Registry Operator","Azure Red Hat OpenShift イメージ レジストリ オペレーター","コンテナー","OpenShift イメージ レジストリのシングルトン インスタンスを管理する。","azure-red-hat-openshift-image-registry-operator"],
+  ["Azure Red Hat OpenShift Machine API Operator","Azure Red Hat OpenShift Machine API オペレーター","コンテナー","クラスター内マシンの状態を宣言するカスタム リソース定義・コントローラーのライフサイクルを管理する。","azure-red-hat-openshift-machine-api-operator"],
+  ["Azure Red Hat OpenShift Network Operator","Azure Red Hat OpenShift ネットワーク オペレーター","コンテナー","OpenShift クラスターのネットワーク コンポーネントをインストール・アップグレードする。","azure-red-hat-openshift-network-operator"],
+  ["Azure Red Hat OpenShift Service Operator","Azure Red Hat OpenShift サービス オペレーター","コンテナー","OpenShift クラスターのマネージド サービスとして、マシンの正常性・ネットワーク構成・監視などを維持する。","azure-red-hat-openshift-service-operator"],
+  ["Connected Cluster Managed Identity CheckAccess Reader","接続済みクラスター マネージド ID の CheckAccess 閲覧者","コンテナー","接続済みクラスターのマネージド ID による checkAccess API 呼び出しを許可する。","connected-cluster-managed-identity-checkaccess-reader"],
+  ["Container Apps ConnectedEnvironments Contributor","Container Apps ConnectedEnvironments 共同作成者","コンテナー","Container Apps の ConnectedEnvironments を作成・削除・更新するなど、完全に管理できる。","container-apps-connectedenvironments-contributor"],
+  ["Container Apps ConnectedEnvironments Reader","Container Apps ConnectedEnvironments 閲覧者","コンテナー","Container Apps の ConnectedEnvironments への読み取りアクセスを許可する。","container-apps-connectedenvironments-reader"],
+  ["Container Apps Jobs Reader","Container Apps ジョブ閲覧者","コンテナー","Container Apps のジョブへの読み取りアクセスを許可する。","container-apps-jobs-reader"],
+  ["Container Apps ManagedEnvironments Contributor","Container Apps ManagedEnvironments 共同作成者","コンテナー","Container Apps の ManagedEnvironments を作成・削除・更新するなど、完全に管理できる。","container-apps-managedenvironments-contributor"],
+  ["Container Apps ManagedEnvironments Reader","Container Apps ManagedEnvironments 閲覧者","コンテナー","Container Apps の ManagedEnvironments への読み取りアクセスを許可する。","container-apps-managedenvironments-reader"],
+  ["Container Apps SessionPools Contributor","Container Apps SessionPools 共同作成者","コンテナー","Container Apps の SessionPools を作成・削除・更新するなど、完全に管理できる。","container-apps-sessionpools-contributor"],
+  ["Container Apps SessionPools Reader","Container Apps SessionPools 閲覧者","コンテナー","Container Apps の SessionPools への読み取りアクセスを許可する。","container-apps-sessionpools-reader"],
+  ["Container Registry Cache Rule Administrator","Container Registry キャッシュ ルール管理者","コンテナー","コンテナー レジストリのキャッシュ規則を作成・読み取り・更新・削除する。","container-registry-cache-rule-administrator"],
+  ["Container Registry Cache Rule Reader","Container Registry キャッシュ ルール閲覧者","コンテナー","コンテナー レジストリのキャッシュ規則の構成を読み取る。","container-registry-cache-rule-reader"],
+  ["Container Registry Configuration Reader and Data Access Configuration Reader","Container Registry 構成閲覧者およびデータ アクセス構成閲覧者","コンテナー","レジストリ構成プロパティとデータ アクセス構成 (資格情報・スコープ マップ・トークンなど) を一覧表示できるが、レジストリ コンテンツ自体は操作できない。","container-registry-configuration-reader-and-data-access-configuration-reader"],
+  ["Container Registry Contributor and Data Access Configuration Administrator","Container Registry 共同作成者およびデータ アクセス構成管理者","コンテナー","レジストリ構成プロパティとデータ アクセス構成 (資格情報・スコープ マップ・トークンなど) を作成・一覧表示・更新できるが、レジストリ コンテンツ自体は操作できない。","container-registry-contributor-and-data-access-configuration-administrator"],
+  ["Container Registry Credential Set Administrator","Container Registry 資格情報セット管理者","コンテナー","コンテナー レジストリの資格情報セットを作成・読み取り・更新・削除する。","container-registry-credential-set-administrator"],
+  ["Container Registry Credential Set Reader","Container Registry 資格情報セット閲覧者","コンテナー","コンテナー レジストリの資格情報セットの構成を読み取る。","container-registry-credential-set-reader"],
+  ["Container Registry Data Importer and Data Reader","Container Registry データ インポーターおよびデータ閲覧者","コンテナー","レジストリへのイメージのインポートと、リポジトリの一覧表示・イメージのプルなどの読み取りができる。","container-registry-data-importer-and-data-reader"],
+  ["Container Registry Repository Catalog Lister","Container Registry リポジトリ カタログ リスター","コンテナー","コンテナー レジストリ内のすべてのリポジトリを一覧表示できる。","container-registry-repository-catalog-lister"],
+  ["Container Registry Tasks Contributor","Container Registry タスク共同作成者","コンテナー","Container Registry のタスク・タスク実行・タスク ログなどを構成・読み取り・実行・キャンセルできる。","container-registry-tasks-contributor"],
+  ["Container Registry Transfer Pipeline Contributor","Container Registry 転送パイプライン共同作成者","コンテナー","中間ストレージとキー コンテナーを含むレジストリ転送パイプラインを構成し、成果物を転送・インポート・エクスポートできる。","container-registry-transfer-pipeline-contributor"],
+
+  // データベース (2026-06 追加分)
+  ["Azure Managed Redis Reader","Azure Managed Redis 閲覧者","データベース","Azure Managed Redis のリソースと構成を読み取る (変更・キー取得・データ読み取りは不可)。","azure-managed-redis-reader"],
+
+  // 分析 (2026-06 追加分)
+  ["HDInsight on AKS Cluster Admin","HDInsight on AKS クラスター管理者","分析","クラスター プール内でクラスターを作成・削除・管理し、ワークロードの実行や監視も行える。","hdinsight-on-aks-cluster-admin"],
+  ["HDInsight on AKS Cluster Pool Admin","HDInsight on AKS クラスター プール管理者","分析","AKS 上の HDInsight クラスター プールを読み取り・作成・変更・削除し、クラスターを作成できる。","hdinsight-on-aks-cluster-pool-admin"],
+
+  // AI・機械学習 (2026-06 追加分)
+  ["Azure AI Enterprise Network Connection Approver","Azure AI Enterprise ネットワーク接続承認者","AI・機械学習","Azure AI の依存リソースへのプライベート エンドポイント接続を承認できる。","azure-ai-enterprise-network-connection-approver"],
+  ["AzureML Metrics Writer (preview)","AzureML メトリックのライター (プレビュー)","AI・機械学習","AzureML ワークスペースにメトリックを書き込める。","azureml-metrics-writer-preview"],
+  ["Cognitive Services Data Reader","Cognitive Services のデータ閲覧者","AI・機械学習","Cognitive Services データを読み取る。","cognitive-services-data-reader"],
+  ["Cognitive Services Face Recognizer","Cognitive Services Face Recognizer","AI・機械学習","Face API の検出・検証・識別・グループ化・検索操作のみを実行できる (作成・削除は不可)。","cognitive-services-face-recognizer"],
+  ["Cognitive Services Immersive Reader User","Cognitive Services Immersive Reader ユーザー","AI・機械学習","Immersive Reader セッションの作成と API 呼び出しへのアクセスを提供する。","cognitive-services-immersive-reader-user"],
+  ["Cognitive Services Metrics Advisor Administrator","Cognitive Services Metrics Advisor 管理者","AI・機械学習","システム レベルの構成を含む、プロジェクトへのフル アクセス。","cognitive-services-metrics-advisor-administrator"],
+  ["Cognitive Services Metrics Advisor User","Cognitive Services Metrics Advisor ユーザー","AI・機械学習","プロジェクトへのアクセス。","cognitive-services-metrics-advisor-user"],
+  ["Cognitive Services QnA Maker Editor","Cognitive Services QnA Maker エディター","AI・機械学習","ナレッジ ベースの作成・編集・インポート・エクスポートができる (公開・削除は不可)。","cognitive-services-qna-maker-editor"],
+  ["Cognitive Services QnA Maker Reader","Cognitive Services QnA Maker 閲覧者","AI・機械学習","ナレッジ ベースの読み取りとテストのみができる。","cognitive-services-qna-maker-reader"],
+  ["Cognitive Services Usages Reader","Cognitive Services の使用状況閲覧者","AI・機械学習","Cognitive Services の使用状況を表示するための最小限のアクセス許可。","cognitive-services-usages-reader"],
+
+  // IoT (2026-06 追加分)
+  ["Azure Device Registry Credentials Contributor","Azure デバイス レジストリ資格情報共同作成者","IoT","Azure Device Registry 名前空間内の資格情報とポリシーを管理するフル アクセスを許可する。","azure-device-registry-credentials-contributor"],
+  ["Azure Device Registry Onboarding","Azure デバイス レジストリのオンボード","IoT","Azure Device Registry 名前空間と X.509 証明書プロビジョニングへのフル アクセスを許可する。","azure-device-registry-onboarding"],
+
+  // 統合 (2026-06 追加分)
+  ["Azure API Center Compliance Manager","Azure API Center コンプライアンス マネージャー","統合","API のコンプライアンス データへの読み書きアクセスを許可する。","azure-api-center-compliance-manager"],
+  ["Azure API Center Data Reader","Azure API Center データ リーダー","統合","Azure API Center のデータ プレーン読み取り操作にアクセスできる。","azure-api-center-data-reader"],
+  ["Azure API Center Service Contributor","Azure API Center サービス共同作成者","統合","Azure API Center サービスを管理できる。","azure-api-center-service-contributor"],
+  ["Azure API Center Service Reader","Azure API Center サービス リーダー","統合","Azure API Center サービスへの読み取り専用アクセスを許可する。","azure-api-center-service-reader"],
+  ["API Management Service Workspace API Developer","API Management サービス ワークスペース API 開発者","統合","タグ・製品の読み取りと、API の製品割り当て・タグ割り当ての書き込みができる。","api-management-service-workspace-api-developer"],
+  ["API Management Service Workspace API Product Manager","API Management サービス ワークスペース API プロダクト マネージャー","統合","API 開発者の権限に加え、ユーザーの読み取りとグループへのユーザー割り当てができる。","api-management-service-workspace-api-product-manager"],
+  ["API Management Workspace API Developer","API Management ワークスペース API 開発者","統合","タグ・製品の読み取りと、API の製品割り当て・タグ割り当ての書き込みができる。","api-management-workspace-api-developer"],
+  ["API Management Workspace API Product Manager","API Management ワークスペース API プロダクト マネージャー","統合","API 開発者の権限に加え、ユーザーの読み取りとグループへのユーザー割り当てができる。","api-management-workspace-api-product-manager"],
+  ["Azure Resource Notifications System Topics Subscriber","Azure リソース通知システム トピック サブスクライバー","統合","Azure リソース通知の全システム トピックに対して、トピックとイベント サブスクリプションを作成できる。","azure-resource-notifications-system-topics-subscriber"],
+  ["DeID Batch Data Owner","DeID バッチのデータ所有者","統合","DeID バッチ ジョブを作成・管理できる (プレビュー)。","deid-batch-data-owner"],
+  ["DeID Batch Data Reader","DeID バッチのデータ閲覧者","統合","DeID バッチ ジョブを読み取れる (プレビュー)。","deid-batch-data-reader"],
+  ["DeID Data Owner","DeID のデータ所有者","統合","DeID データへのフル アクセス (プレビュー)。","deid-data-owner"],
+  ["DeID Realtime Data User","DeID リアルタイム データ ユーザー","統合","DeID リアルタイム エンドポイントに要求を実行できる (プレビュー)。","deid-realtime-data-user"],
+  ["EventGrid TopicSpaces Publisher","EventGrid TopicSpaces パブリッシャー","統合","TopicSpaces でメッセージを発行できる。","eventgrid-topicspaces-publisher"],
+  ["EventGrid TopicSpaces Subscriber","EventGrid TopicSpaces のサブスクライバー","統合","TopicSpaces でメッセージをサブスクライブできる。","eventgrid-topicspaces-subscriber"],
+  ["FHIR Data Bulk Operator","FHIR データ一括演算子","統合","ユーザーまたはプリンシパルが一括操作を実行できるようにする。","fhir-data-bulk-operator"],
+  ["FHIR SMART User","FHIR SMART ユーザー","統合","SMART on FHIR 仕様に従って FHIR サービスへのアクセスを許可する。","fhir-smart-user"],
+  ["Intelligent Systems Account Contributor","Intelligent Systems アカウント共同作成者","統合","Intelligent Systems アカウントを管理できるが、アクセスはできない。","intelligent-systems-account-contributor"],
+  ["Logic Apps Standard Contributor (Preview)","Logic Apps Standard の共同作成者 (プレビュー)","統合","Standard ロジック アプリとワークフローを管理できる (アクセス・所有権の変更は不可)。","logic-apps-standard-contributor-preview"],
+  ["Logic Apps Standard Developer (Preview)","Logic Apps Standard の開発者 (プレビュー)","統合","Standard ロジック アプリのワークフロー・接続・設定を作成・編集できる。","logic-apps-standard-developer-preview"],
+  ["Logic Apps Standard Operator (Preview)","Logic Apps Standard のオペレーター (プレビュー)","統合","ロジック アプリの有効化・無効化、ワークフロー実行の再送信、接続作成ができる。","logic-apps-standard-operator-preview"],
+  ["Logic Apps Standard Reader (Preview)","Logic Apps Standard の閲覧者 (プレビュー)","統合","Standard ロジック アプリとワークフロー (実行履歴を含む) への読み取り専用アクセス。","logic-apps-standard-reader-preview"],
+  ["Scheduler Job Collections Contributor","スケジューラ ジョブ コレクション共同作成者","統合","スケジューラ ジョブ コレクションを管理できるが、アクセスはできない。","scheduler-job-collections-contributor"],
+
+  // 監視 (2026-06 追加分)
+  ["Grafana Limited Viewer","Grafana の制限付き閲覧者","監視","Grafana のホーム ページを表示できる。","grafana-limited-viewer"],
+  ["Log Analytics Data Reader","Log Analytics データ リーダー","監視","閲覧可能な Log Analytics ワークスペース・テーブルのログをクエリ・検索できる。","log-analytics-data-reader"],
+  ["Monitoring Policy Contributor","監視ポリシー共同作成者","監視","すべての監視データの読み取りと監視設定の更新、Azure Monitor のアラート ポリシーの展開・修復を許可する。","monitoring-policy-contributor"],
+  ["Service Health Security Reader","サービス正常性セキュリティ閲覧者","監視","サービス正常性イベントに存在する機密性の高いセキュリティ情報を表示できる。","service-health-security-reader"],
+  ["Application Insights Snapshot Debugger","アプリケーション インサイト スナップショット デバッガー","監視","Application Insights のスナップショット デバッガーで収集されたデバッグ スナップショットの表示とダウンロードを許可する。","application-insights-snapshot-debugger"],
+  ["Azure Managed Grafana Workspace Contributor","Azure Managed Grafana ワークスペース共同作成者","監視","ワークスペース自体へのアクセスを提供せずに、Azure Managed Grafana リソースを管理できる。","azure-managed-grafana-workspace-contributor"],
+
+  // DevOps (2026-06 追加分)
+  ["Chaos Studio Target Contributor","Chaos Studio ターゲット共同作成者","DevOps","ターゲットのオンボードと機能管理ができるが、実験の作成・実行・閲覧はできない。","chaos-studio-target-contributor"],
+  ["Chaos Studio Reader","Chaos Studio 閲覧者","DevOps","ターゲット・機能・実験・実験の詳細を表示できる。","chaos-studio-reader"],
+  ["Deployment Environments Reader","Deployment Environments 閲覧者","DevOps","環境リソースへの読み取りアクセスを提供する。","deployment-environments-reader"],
+  ["DevOps Infrastructure Contributor","DevOps インフラストラクチャ共同作成者","DevOps","マネージド DevOps プールの読み取り・書き込み・削除・操作実行ができる。","devops-infrastructure-contributor"],
+  ["Lab Services Contributor","ラボ サービス共同作成者","DevOps","リソース グループ内のラボ サービスのすべてのシナリオを完全に制御できる。","lab-services-contributor"],
+  ["Lab Services Reader","ラボ サービス閲覧者","DevOps","すべてのラボ プランとリソースを表示できるが、変更はできない。","lab-services-reader"],
+
+  // 管理・ガバナンス (2026-06 追加分)
+  ["Azure Center for SAP Solutions Service Role","Azure Center for SAP ソリューション サービス ロール","管理・ガバナンス","ユーザー割り当てマネージド ID へのアクセスを提供し、SAP システムのデプロイ・管理に使用される。","azure-center-for-sap-solutions-service-role"],
+  ["Azure Connected Machine Resource Manager","Azure Connected Machine Resource Manager","管理・ガバナンス","リソース グループ内のハイブリッド コンピューティング マシンと接続エンドポイントを管理するためのカスタム ロール。","azure-connected-machine-resource-manager"],
+  ["Azure Customer Lockbox Approver for Subscription","サブスクリプションの Azure Customer Lockbox 承認者","管理・ガバナンス","サブスクリプション内リソースへのアクセスに関する Microsoft のサポート要求を承認できる。","azure-customer-lockbox-approver-for-subscription"],
+  ["Essential Machine Management Administrator","Essential Machine Management 管理者","管理・ガバナンス","サブスクリプションの Essential Machine Management リソースを管理できる。","essential-machine-management-administrator"],
+  ["Managed Application Contributor Role","Managed Application 共同作成者ロール","管理・ガバナンス","マネージド アプリケーション リソースの作成を許可する。","managed-application-contributor-role"],
+  ["Managed Application Operator Role","Managed Application オペレーター ロール","管理・ガバナンス","マネージド アプリケーション リソースの読み取りと操作の実行ができる。","managed-application-operator-role"],
+  ["Managed Application Publisher Operator","マネージド アプリケーション パブリッシャー オペレーター","管理・ガバナンス","パブリッシャーがマネージド リソース グループ内のリソースを読み取り、追加操作のために JIT アクセスを要求できるようにする。","managed-application-publisher-operator"],
+  ["New Relic APM Account Contributor","New Relic APM アカウント共同作成者","管理・ガバナンス","New Relic APM のアカウント・アプリケーションを管理できるが、アクセスはできない。","new-relic-apm-account-contributor"],
+  ["Policy Insights Data Writer (Preview)","Policy Insights データ ライター (プレビュー)","管理・ガバナンス","リソース ポリシーの読み取りと、リソース コンポーネントのポリシー イベントへの書き込みを許可する。","policy-insights-data-writer-preview"],
+  ["Reservations Reader","予約閲覧者","管理・ガバナンス","テナント内のすべての予約を読み取れる。","reservations-reader"],
+  ["Savings Plan Purchaser","節約プランの購入者","管理・ガバナンス","Savings Plan を購入できる。","savings-plan-purchaser"],
+  ["Scheduled Patching Contributor","予定パッチ共同作成者","管理・ガバナンス","InGuestPatch スコープのメンテナンス構成とその割り当てを管理するアクセスを提供する。","scheduled-patching-contributor"],
+  ["Service Group Administrator","サービス グループ管理者","管理・ガバナンス","サービス グループとリレーションシップを管理する、グループ作成時の既定ロール。","service-group-administrator"],
+  ["Service Group Contributor","サービス グループ共同作成者","管理・ガバナンス","サービス グループとリレーションシップを管理できるが、ロール割り当てはできない。","service-group-contributor"],
+  ["Service Group Reader","サービス グループ閲覧者","管理・ガバナンス","サービス グループを読み取り、接続関係を表示できる。","service-group-reader"],
+  ["SRE Agent Administrator","SRE エージェント管理者","管理・ガバナンス","エージェントを完全に制御し、チャット・インシデント対応計画・実行モードを管理してコマンドを承認・実行できる。","sre-agent-administrator"],
+  ["SRE Agent Reader","SRE エージェント リーダー","管理・ガバナンス","SRE エージェントの全データへの読み取り専用アクセスを許可する (対話は不可)。","sre-agent-reader"],
+  ["SRE Agent Standard User","SRE エージェント標準ユーザー","管理・ガバナンス","SRE エージェントと対話して、インシデントのトリアージと診断を実行できる。","sre-agent-standard-user"],
+  ["Advisor Recommendations Contributor (Assessments and Reviews)","Advisor の推奨事項の共同作成者 (評価とレビュー)","管理・ガバナンス","アセスメントの推奨事項の表示と、承認されたレビューの推奨事項の表示、および推奨事項のライフサイクル管理 (完了・延期・無視・進行中・未開始のマーク付け) を行える。","advisor-recommendations-contributor-assessments-and-reviews"],
+
+  // 移行 (2026-06 追加分)
+  ["Azure Migrate Decide and Plan Expert","Azure Migrate の決定と計画のエキスパート","移行","アプライアンスベースの検出、インベントリの管理、サーバーの依存関係の識別、ビジネス ケースの作成、評価レポートなどの計画操作のみを実行できるよう、Azure Migrate プロジェクトへの制限付きアクセスを許可する。","azure-migrate-decide-and-plan-expert"],
+  ["Azure Migrate Execute Expert","Azure Migrate 実行エキスパート","移行","レプリケーション、テスト移行の実行、移行の進行状況の追跡・監視など、移行関連の操作のみを実行できるよう、Azure Migrate プロジェクトへの制限付きアクセスを許可する。","azure-migrate-execute-expert"],
+  ["Azure Migrate Owner","Azure Migrate 所有者","移行","アプライアンスベースの検出、ビジネス ケースの作成、評価レポート、移行の実行など、Azure Migrate プロジェクトを作成・管理するためのフル アクセスを許可する。","azure-migrate-owner"],
+  ["Azure Migrate Service Reader","Azure Migrate サービス閲覧者","移行","Azure Migrate プロジェクト リソースのシステム割り当てマネージド ID への必要なアクセス権を付与する。","azure-migrate-service-reader"],
+  ["Migrate Arc Discovery Reader - Preview","Migrate Arc Discovery 閲覧者 - プレビュー","移行","Azure Arc 対応サーバー リソースのメタデータと、Arc 対応 SQL Server リソースのパフォーマンス・移行適合性を読み取る。","migrate-arc-discovery-reader---preview"],
+];
+
+const ROLES = RAW.map(([en,ja,cat,desc,anchor]) => ({
+  en, ja, cat, desc, anchor,
+  approx: APPROX.has(en)
+}));
+
+const cats = [...new Set(ROLES.map(r=>r.cat))].sort();
+
+// Build category filter buttons
+const fr = document.querySelector('.filter-row');
+cats.forEach(c=>{
+  const b=document.createElement('button');
+  b.className='fb'; b.dataset.cat=c; b.textContent=c; fr.appendChild(b);
+});
+
+document.getElementById('tc').textContent = ROLES.length;
+document.getElementById('cc').textContent = cats.length;
+
+let activeCat='all', q='', sortCol=null, sortDir=1;
+
+const esc = s => s.replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+const hi = (t,q) => !q ? esc(t) : esc(t).replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'),'<mark>$1</mark>');
+
+function render(){
+  let data = ROLES.filter(r=>{
+    const mc = activeCat==='all' || r.cat===activeCat;
+    const mq = !q || [r.en,r.ja,r.desc,r.cat].some(v=>v.toLowerCase().includes(q));
+    return mc && mq;
+  });
+  if(sortCol) data.sort((a,b)=>a[sortCol].localeCompare(b[sortCol],'ja')*sortDir);
+  document.getElementById('sc').textContent=data.length;
+  const nr=document.getElementById('nr'), tb=document.getElementById('tb');
+  if(!data.length){tb.innerHTML='';nr.style.display='block';return;}
+  nr.style.display='none';
+  tb.innerHTML=data.map(r=>{
+    const approxBadge=r.approx?`<span class="approx-badge" title="公式 Portal UI に日本語名が確認できません。翻訳は近似値です。">※ 近似訳</span>`:'';
+    return `<tr>
+      <td><div class="en">${hi(r.en,q)}</div></td>
+      <td><div class="ja">${hi(r.ja,q)}${approxBadge}</div></td>
+      <td><span class="cat-tag">${esc(r.cat)}</span></td>
+      <td><div class="desc">${hi(r.desc,q)}</div></td>
+      <td><a class="dl" href="${roleUrl(r)}" target="_blank" rel="noopener">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        Docs
+      </a></td>
+    </tr>`;
+  }).join('');
+}
+
+// Category filter
+document.querySelectorAll('[data-cat]').forEach(b=>{
+  b.addEventListener('click',()=>{
+    activeCat=b.dataset.cat;
+    document.querySelectorAll('[data-cat]').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); render();
+  });
+});
+
+// Via filter
+// Search
+document.getElementById('search').addEventListener('input',e=>{
+  q=e.target.value.trim().toLowerCase(); render();
+});
+
+// Sort
+document.querySelectorAll('th[data-col]').forEach(th=>{
+  th.addEventListener('click',()=>{
+    const c=th.dataset.col;
+    if(sortCol===c){sortDir*=-1;th.className=sortDir===1?'asc':'desc';}
+    else{document.querySelectorAll('th').forEach(x=>x.className='');sortCol=c;sortDir=1;th.className='asc';}
+    render();
+  });
+});
+
+// Docs panel toggle
+let docsOpen=true;
+function toggleDocs(){
+  docsOpen=!docsOpen;
+  document.getElementById('docs-body').style.display=docsOpen?'grid':'none';
+  document.getElementById('docs-toggle-btn').textContent=docsOpen?'▲':'▼';
+}
+
+render();
+</script>
+</body>
+</html>
